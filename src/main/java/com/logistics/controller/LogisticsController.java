@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import com.logistics.dto.MidDayOptimizationRequest;
 
 @RestController
 @RequestMapping("/api")
@@ -63,5 +64,23 @@ public class LogisticsController {
     public String reportRepair(@PathVariable String vehicleId) {
         brokenVehicles.remove(vehicleId);
         return "Vehicle " + vehicleId + " has been repaired.";
+    }
+
+    @PostMapping("/reoptimize")
+    public OptimizationResponse reoptimizeMidDay(@RequestBody MidDayOptimizationRequest request) {
+        List<RouteSegment> segments = optimizationStrategy.optimizeMidDay(
+                request,
+                dataLoader.getVehicles(),
+                dataLoader.getDrivers(),
+                new HashSet<>(brokenVehicles)
+        );
+
+        segments.sort(Comparator.comparing(RouteSegment::getStartTime));
+
+        double totalProfit = segments.stream().mapToDouble(RouteSegment::getProfitOrCost).sum();
+        long completed = segments.stream().filter(s -> "ORDER".equals(s.getType().name())).count();
+        double totalDistance = segments.stream().mapToDouble(RouteSegment::getDistanceKm).sum();
+
+        return new OptimizationResponse(segments, totalProfit, completed, totalDistance);
     }
 }

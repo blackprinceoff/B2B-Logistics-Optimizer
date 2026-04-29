@@ -6,18 +6,16 @@ import com.logistics.service.DistanceService;
 import com.logistics.service.SmartGraphOptimizationStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.HashSet;
 import java.util.List;
 
 @Slf4j
-@SpringBootApplication
 public class SimulationRunner {
 
     public static void main(String[] args) {
-        ConfigurableApplicationContext context = SpringApplication.run(SimulationRunner.class, args);
+        ConfigurableApplicationContext context = SpringApplication.run(BackendApplication.class, args);
 
         SmartGraphOptimizationStrategy strategy = context.getBean(SmartGraphOptimizationStrategy.class);
         CsvDataLoaderService dataLoader = context.getBean(CsvDataLoaderService.class);
