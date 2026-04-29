@@ -16,6 +16,7 @@ import com.logistics.dto.MidDayOptimizationRequest;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class LogisticsController {
 
