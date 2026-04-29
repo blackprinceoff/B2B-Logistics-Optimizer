@@ -1,12 +1,16 @@
 package com.logistics.service;
 
+import com.logistics.dto.AnalysisResult;
+import com.logistics.dto.MonteCarloStats;
 import com.logistics.model.Order;
 import com.logistics.model.RouteSegment;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnalysisService {
@@ -14,28 +18,16 @@ public class AnalysisService {
     private final CsvDataLoaderService dataLoader;
     private final SmartGraphOptimizationStrategy optimizationStrategy;
 
-    // Структура для повернення JSON на фронтенд
-    public record AnalysisResult(
-            Map<Integer, Double> lookAheadSensitivity,
-            double baselineProfit,
-            double smartProfit,
-            double optimalityGap,
-            MonteCarloStats monteCarloStats
-    ) {}
-
-    public record MonteCarloStats(
-            double expectedValue, // M[X] (Математичне сподівання)
-            double variance,      // D[X] (Дисперсія)
-            double stdDev,        // Сигма (Середньоквадратичне відхилення)
-            double minProfit,
-            double maxProfit,
-            List<Double> distribution // Усі результати для гістограми
-    ) {}
-
+    /**
+     * Runs a full mathematical analysis of the optimization strategy including
+     * sensitivity analysis for look-ahead horizons and Monte Carlo simulations.
+     *
+     * @return AnalysisResult containing sensitivity and statistical data
+     */
     public AnalysisResult runFullAnalysis() {
-        System.out.println("⏳ Початок математичного аналізу...");
+        log.info("Starting mathematical analysis...");
 
-        // 1. Аналіз чутливості (Sensitivity Analysis) для параметра Look-Ahead
+        // 1. Sensitivity Analysis for Look-Ahead horizon
         Map<Integer, Double> sensitivity = new TreeMap<>();
         int[] horizons = {0, 30, 60, 90, 120, 180, 240};
 
@@ -45,22 +37,18 @@ public class AnalysisService {
             sensitivity.put(h, profit);
         }
 
-        // 2. Оцінка ефективності (Optimality Gap)
-        // Baseline: Жадібний алгоритм (Look-Ahead = 0)
-        double baselineProfit = sensitivity.get(0);
-        // Smart: Наш оптимум (Look-Ahead = 120)
-        double smartProfit = sensitivity.get(120);
+        // 2. Optimality Gap Evaluation
+        double baselineProfit = sensitivity.get(0); // Greedy algorithm baseline
+        double smartProfit = sensitivity.get(120);  // Optimized horizon
 
-        // Формула: Gap = (Smart - Baseline) / |Baseline| * 100%
         double optimalityGap = 0;
         if (baselineProfit != 0) {
             optimalityGap = ((smartProfit - baselineProfit) / Math.abs(baselineProfit)) * 100.0;
         }
 
-        // 3. Стохастичне моделювання (Метод Монте-Карло)
-        // Повертаємо оптимальний параметр
+        // 3. Monte Carlo Simulation for stochastic events
         optimizationStrategy.setLookAheadMinutes(120);
-        int iterations = 50; // Кількість прогонів "одного дня"
+        int iterations = 50;
         List<Double> mcResults = new ArrayList<>();
 
         double sum = 0;
@@ -75,17 +63,14 @@ public class AnalysisService {
             if (profit > max) max = profit;
         }
 
-        // Математичне сподівання M[X]
         double expectedValue = sum / iterations;
 
-        // Дисперсія D[X] = sum((X - M[X])^2) / N
         double varianceSum = 0;
         for (Double p : mcResults) {
             varianceSum += Math.pow(p - expectedValue, 2);
         }
         double variance = varianceSum / iterations;
 
-        // Середньоквадратичне відхилення (Сигма)
         double stdDev = Math.sqrt(variance);
 
         MonteCarloStats mcStats = new MonteCarloStats(
@@ -97,14 +82,13 @@ public class AnalysisService {
                 mcResults
         );
 
-        System.out.println("✅ Аналіз завершено!");
+        log.info("Analysis completed successfully.");
 
         return new AnalysisResult(sensitivity, baselineProfit, smartProfit, optimalityGap, mcStats);
     }
 
     private double simulateSingleRun() {
         Set<String> brokenVehicles = new HashSet<>();
-        // Створюємо копію замовлень, щоб алгоритм міг їх безпечно сортувати
         List<Order> ordersCopy = new ArrayList<>(dataLoader.getOrders());
 
         List<RouteSegment> schedule = optimizationStrategy.optimize(
@@ -114,7 +98,6 @@ public class AnalysisService {
                 brokenVehicles
         );
 
-        // Рахуємо сумарний прибуток/витрати зі всіх сегментів (включно з добиранням)
         return schedule.stream().mapToDouble(RouteSegment::getProfitOrCost).sum();
     }
 }

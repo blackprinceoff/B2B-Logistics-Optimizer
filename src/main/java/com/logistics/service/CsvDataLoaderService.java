@@ -4,6 +4,7 @@ import com.logistics.model.*;
 import com.opencsv.bean.CsvToBeanBuilder;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStreamReader;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @Getter
 public class CsvDataLoaderService {
@@ -24,21 +26,16 @@ public class CsvDataLoaderService {
 
     @PostConstruct
     public void init() {
-        System.out.println("--- ПОЧАТОК ЗАВАНТАЖЕННЯ ДАНИХ ---");
+        log.info("Starting data loading process...");
 
         locations = loadFile("locations.csv", Location.class);
         vehicles = loadFile("vehicles.csv", Vehicle.class);
         drivers = loadFile("drivers.csv", Driver.class);
         orders = loadFile("orders.csv", Order.class);
-        // Завантажуємо матрицю відстаней
         distanceEntries = loadFile("distances.csv", DistanceEntry.class);
 
-        System.out.println("--- ЗАВАНТАЖЕННЯ ЗАВЕРШЕНО ---");
-        System.out.println("Локацій: " + locations.size());
-        System.out.println("Транспорту: " + vehicles.size());
-        System.out.println("Водіїв: " + drivers.size());
-        System.out.println("Замовлень: " + orders.size());
-        System.out.println("Записів відстаней: " + distanceEntries.size());
+        log.info("Data loading completed. Locations: {}, Vehicles: {}, Drivers: {}, Orders: {}, Distance entries: {}",
+                locations.size(), vehicles.size(), drivers.size(), orders.size(), distanceEntries.size());
     }
 
     private <T> List<T> loadFile(String filename, Class<T> type) {
@@ -52,8 +49,7 @@ public class CsvDataLoaderService {
                     .parse();
 
         } catch (Exception e) {
-            System.err.println("Помилка при читанні файлу " + filename + ": " + e.getMessage());
-            // e.printStackTrace(); // для дебагу
+            log.error("Error reading file {}: {}", filename, e.getMessage(), e);
             return new ArrayList<>();
         }
     }

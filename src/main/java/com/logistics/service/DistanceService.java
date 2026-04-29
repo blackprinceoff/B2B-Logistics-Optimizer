@@ -4,6 +4,7 @@ import com.logistics.model.DistanceEntry;
 import com.logistics.model.Location;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,13 +13,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DistanceService {
 
     private final CsvDataLoaderService dataLoader;
     
-    // Кеш для швидкого пошуку: "fromId_toId" -> DistanceEntry
+    // Cache for quick lookups: "fromId_toId" -> DistanceEntry
     private final Map<String, DistanceEntry> distanceCache = new HashMap<>();
 
     private static final int EARTH_RADIUS_KM = 6371;
@@ -32,25 +34,25 @@ public class DistanceService {
 
     @PostConstruct
     public void initCache() {
-        // Перетворюю список у Map для миттєвого доступу O(1)
+        // Convert the list to a Map for O(1) instant access
         for (DistanceEntry entry : dataLoader.getDistanceEntries()) {
             String key = generateKey(entry.getFromId(), entry.getToId());
             distanceCache.put(key, entry);
         }
-        System.out.println("DistanceService: Cached " + distanceCache.size() + " routes.");
+        log.info("DistanceService: Cached {} routes.", distanceCache.size());
     }
 
     public double getDistanceKm(Location from, Location to) {
         if (from.getId().equals(to.getId())) return 0.0;
 
-        // 1. Спробувати знайти точну відстань у кеші (OSRM)
+        // 1. Try to find the exact distance in the cache (OSRM)
         String key = generateKey(from.getId(), to.getId());
         if (distanceCache.containsKey(key)) {
             return distanceCache.get(key).getDistanceKm();
         }
 
-        // 2. Fallback: Евристика
-        System.out.println("Warning: No OSRM data for " + from.getId() + "->" + to.getId() + ". Using heuristic.");
+        // 2. Fallback: Heuristic calculation
+        log.warn("Warning: No OSRM data for {}->{}. Using heuristic.", from.getId(), to.getId());
         return calculateHeuristicDistance(from, to);
     }
 
@@ -59,27 +61,24 @@ public class DistanceService {
 
         double baseMinutes;
         
-        // 1. Спробувати знайти точний час у кеші (OSRM)
+        // 1. Try to find exact duration in the cache (OSRM)
         String key = generateKey(from.getId(), to.getId());
         if (distanceCache.containsKey(key)) {
             baseMinutes = distanceCache.get(key).getDurationMin();
         } else {
-            // 2. Fallback: Розрахунок
+            // 2. Fallback: Calculation based on distance and average speed
             double dist = calculateHeuristicDistance(from, to);
             double avgSpeed = getSmartAverageSpeed(from, to, dist);
             baseMinutes = (dist / avgSpeed) * 60.0;
         }
 
-        // 3. Накладаємо динамічні фактори (Затори + Шум)
-        // Навіть якщо дані з OSRM, вони зазвичай "чисті" (без заторів), тому коефіцієнт потрібен
+        // 3. Apply dynamic factors (Traffic + Noise)
+        // Even OSRM data is often "clean" (without traffic), so a coefficient is needed
         double trafficFactor = getTrafficFactor(departureTime.toLocalTime());
         double noise = 0.95 + (0.1 * random.nextDouble()); // ±5%
         // double noise = 1.00;
 
         return baseMinutes * (1.0 / trafficFactor) * noise; 
-        // trafficFactor < 1 означає затор, тому ділимо швидкість або множимо час?
-        // У getTrafficFactor я повертав коефіцієнт швидкості (0.6 = повільно).
-        // Час = База / (ФакторШвидкості) -> База / 0.6 = База * 1.66 (часу більше)
     }
 
     public double getFuelConsumptionFactor(Location loc) {
@@ -136,11 +135,11 @@ public class DistanceService {
 
     private double getTrafficFactor(LocalTime time) {
         int hour = time.getHour();
-        // Повертає % від нормальної швидкості (1.0 = 100%)
-        if (hour < 6) return 1.2; // Швидше
-        if (hour >= 8 && hour < 10) return 0.6; // Затор
-        if (hour >= 17 && hour < 19) return 0.65; // Затор
-        if (hour >= 10 && hour < 17) return 0.85; // Робочий день
+        // Returns percentage of normal speed (1.0 = 100%)
+        if (hour < 6) return 1.2; // Faster
+        if (hour >= 8 && hour < 10) return 0.6; // Traffic jam
+        if (hour >= 17 && hour < 19) return 0.65; // Traffic jam
+        if (hour >= 10 && hour < 17) return 0.85; // Work day
         return 1.0;
     }
 }

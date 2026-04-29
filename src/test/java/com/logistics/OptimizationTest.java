@@ -6,11 +6,13 @@ import com.logistics.service.DistanceService;
 import com.logistics.service.SmartGraphOptimizationStrategy;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.HashSet;
 import java.util.List;
 
+@Slf4j
 @SpringBootTest
 public class OptimizationTest {
 
@@ -28,7 +30,7 @@ public class OptimizationTest {
         // 1. Ініціалізація кешу відстаней (важливо для тесту)
         distanceService.initCache();
         
-        System.out.println(">>> STARTING OPTIMIZATION TEST <<<");
+        log.info(">>> STARTING OPTIMIZATION TEST <<<");
 
         // 2. Запуск оптимізації
         List<RouteSegment> schedule = strategy.optimize(
@@ -43,16 +45,16 @@ public class OptimizationTest {
         long ordersCompleted = schedule.stream().filter(s -> "ORDER".equals(s.getType().name())).count();
         long breakdowns = schedule.stream().filter(s -> "BREAKDOWN".equals(s.getType().name())).count();
 
-        System.out.println("\n>>> TEST RESULTS <<<");
-        System.out.println("Total Profit: " + String.format("%.2f", totalProfit) + " UAH");
-        System.out.println("Orders Completed: " + ordersCompleted + " / " + dataLoader.getOrders().size());
-        System.out.println("Breakdowns: " + breakdowns);
+        log.info(">>> TEST RESULTS <<<");
+        log.info("Total Profit: {} UAH", String.format("%.2f", totalProfit));
+        log.info("Orders Completed: {} / {}", ordersCompleted, dataLoader.getOrders().size());
+        log.info("Breakdowns: {}", breakdowns);
         
         // Вивід деталей для перевірки Carpooling
-        System.out.println("\n--- Commute Details ---");
+        log.info("--- Commute Details ---");
         schedule.stream()
                 .filter(s -> s.getProfitOrCost() < 0 && s.getDistanceKm() > 0 && s.getType().name().equals("TRANSFER") && s.getStartTime().getHour() < 9)
                 .limit(5)
-                .forEach(s -> System.out.println(s.getDriverId() + ": " + s.getProfitOrCost() + " UAH (" + s.getDistanceKm() + " km)"));
+                .forEach(s -> log.info("{}: {} UAH ({} km)", s.getDriverId(), s.getProfitOrCost(), s.getDistanceKm()));
     }
 }

@@ -15,11 +15,14 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Утиліта для генерації матриці відстаней на основі locations.csv.
  * Використовує OSRM API.
  * Результат записується у src/main/resources/distances.csv
  */
+@Slf4j
 public class MatrixGenerator {
 
     private static final String LOCATIONS_FILE = "src/main/resources/locations.csv";
@@ -29,15 +32,15 @@ public class MatrixGenerator {
     record LocationPoint(String id, double lat, double lon) {}
 
     public static void main(String[] args) {
-        System.out.println(">>> Start generating Distance Matrix...");
+        log.info(">>> Start generating Distance Matrix...");
         
         List<LocationPoint> locations = readLocations(LOCATIONS_FILE);
         if (locations.isEmpty()) {
-            System.err.println("No locations found in " + LOCATIONS_FILE);
+            log.error("No locations found in {}", LOCATIONS_FILE);
             return;
         }
 
-        System.out.println("Loaded " + locations.size() + " locations. Calculating routes...");
+        log.info("Loaded {} locations. Calculating routes...", locations.size());
 
         try (FileWriter writer = new FileWriter(OUTPUT_FILE, StandardCharsets.UTF_8)) {
             // Записуємо заголовок CSV
@@ -72,25 +75,25 @@ public class MatrixGenerator {
                             durationMin = Math.round((durationMin / 60.0) * 10.0) / 10.0;   // до 1 знаку
 
                             // ВИПРАВЛЕННЯ: Використовуємо Locale.US для крапки замість коми
-                            writer.write(String.format(Locale.US, "%s,%s,%.2f,%.1f\n", from.id, to.id, distanceKm, durationMin));
-                            System.out.printf(Locale.US, "Route %s -> %s: %.2f km, %.1f min%n", from.id, to.id, distanceKm, durationMin);
+                            writer.write(String.format(Locale.US, "%s,%s,%.2f,%.1f\n", from.id(), to.id(), distanceKm, durationMin));
+                            log.info(String.format(Locale.US, "Route %s -> %s: %.2f km, %.1f min", from.id(), to.id(), distanceKm, durationMin));
                         } else {
-                            System.err.println("API Error for " + from.id + "->" + to.id + ": " + response.statusCode());
+                            log.error("API Error for {}->{}: {}", from.id(), to.id(), response.statusCode());
                         }
 
                         // Пауза, щоб не отримати бан від OSRM (demo server limit)
                         Thread.sleep(250); 
 
                     } catch (Exception e) {
-                        System.err.println("Error calculating " + from.id + "->" + to.id + ": " + e.getMessage());
+                        log.error("Error calculating {}->{}: {}", from.id(), to.id(), e.getMessage());
                     }
                     count++;
                 }
             }
-            System.out.println(">>> Done! Matrix saved to " + OUTPUT_FILE);
+            log.info(">>> Done! Matrix saved to {}", OUTPUT_FILE);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("IOException: {}", e.getMessage(), e);
         }
     }
 
@@ -112,7 +115,7 @@ public class MatrixGenerator {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error reading CSV: " + e.getMessage());
+            log.error("Error reading CSV: {}", e.getMessage(), e);
         }
         return list;
     }
