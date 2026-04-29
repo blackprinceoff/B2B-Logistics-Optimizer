@@ -6,6 +6,7 @@ export default function Dashboard() {
   const [scheduleData, setScheduleData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState('All');
 
   const handleRunOptimization = async () => {
     setLoading(true);
@@ -16,6 +17,7 @@ export default function Dashboard() {
       const data = await response.json();
       setScheduleData(data);
     } catch (err) {
+      console.error("Fetch Error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -55,9 +57,11 @@ export default function Dashboard() {
         loading={loading} 
         onOptimize={handleRunOptimization}
         onMidDayOptimize={handleMidDayReoptimization}
+        selectedVehicle={selectedVehicle}
+        setSelectedVehicle={setSelectedVehicle}
       />
       <div style={{ flexGrow: 1, position: 'relative' }}>
-        <MapComponent scheduleData={scheduleData} />
+        <MapComponent scheduleData={scheduleData} selectedVehicle={selectedVehicle} />
       </div>
     </div>
   );

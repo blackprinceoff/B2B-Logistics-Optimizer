@@ -34,46 +34,58 @@ const dotIcon = new L.DivIcon({
   iconAnchor: [6, 6]
 });
 
-export default function MapComponent({ scheduleData }) {
+export default function MapComponent({ scheduleData, selectedVehicle }) {
   const [routes, setRoutes] = useState([]);
 
   useEffect(() => {
-    if (!scheduleData?.segments) return;
+    if (!scheduleData?.schedule) return;
 
     const fetchGeometries = async () => {
-      const newRoutes = [];
-      for (const seg of scheduleData.segments) {
+      const filteredSchedule = selectedVehicle === 'All' 
+        ? scheduleData.schedule 
+        : scheduleData.schedule.filter(s => s.vehicleId === selectedVehicle);
+
+      // 1. Instantly draw straight lines for all routes
+      const initialRoutes = filteredSchedule.map(seg => {
         const start = locations[seg.startLocationId];
         const end = locations[seg.endLocationId];
-        if (!start || !end) continue;
+        if (!start || !end) return null;
+        if (start === end && seg.type === 'BREAKDOWN') return { type: 'BREAKDOWN', start, vehicleId: seg.vehicleId };
+        return { ...seg, coords: [[start.lat, start.lng], [end.lat, end.lng]] };
+      }).filter(Boolean);
 
-        if (start === end) {
-          if (seg.type === 'BREAKDOWN') {
-            newRoutes.push({ type: 'BREAKDOWN', start, vehicleId: seg.vehicleId });
-          }
-          continue; // WAITING segments don't need lines
-        }
+      setRoutes([...initialRoutes]);
+
+      // 2. Fetch actual road geometries sequentially (to avoid OSRM rate limits) and update incrementally
+      for (let i = 0; i < initialRoutes.length; i++) {
+        const route = initialRoutes[i];
+        if (route.type === 'BREAKDOWN') continue;
+        
+        const start = locations[route.startLocationId];
+        const end = locations[route.endLocationId];
+        if (start.lat === end.lat && start.lng === end.lng) continue;
 
         try {
           const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
           const res = await fetch(url);
+          if (!res.ok) continue; // Skip on rate limit
           const json = await res.json();
           if (json.routes && json.routes.length > 0) {
-            // OSRM returns [lng, lat], Leaflet wants [lat, lng]
             const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            newRoutes.push({ ...seg, coords });
-          } else {
-            newRoutes.push({ ...seg, coords: [[start.lat, start.lng], [end.lat, end.lng]] });
+            setRoutes(prev => {
+              const updated = [...prev];
+              updated[i] = { ...updated[i], coords };
+              return updated;
+            });
           }
         } catch (e) {
-          newRoutes.push({ ...seg, coords: [[start.lat, start.lng], [end.lat, end.lng]] });
+          // keep straight line if fetch fails
         }
       }
-      setRoutes(newRoutes);
     };
 
     fetchGeometries();
-  }, [scheduleData]);
+  }, [scheduleData, selectedVehicle]);
 
   const getPathOptions = (seg) => {
     if (seg.type === 'ORDER') return { color: '#34c759', weight: 4, opacity: 0.8 };

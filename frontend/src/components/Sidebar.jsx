@@ -8,10 +8,17 @@ const locations = {
   "10": "Високий Замок", "11": "Епіцентр (Кільцева)", "12": "Винники (Госпіталь)"
 };
 
-export default function Sidebar({ data, loading, onOptimize, onMidDayOptimize }) {
+export default function Sidebar({ data, loading, onOptimize, onMidDayOptimize, selectedVehicle, setSelectedVehicle }) {
   
-  const segments = data?.segments || [];
+  const segments = data?.schedule || [];
   const profit = data?.totalProfit || 0;
+  
+  // Get unique vehicle IDs
+  const vehicles = ['All', ...new Set(segments.map(s => s.vehicleId))].sort();
+
+  const filteredSegments = selectedVehicle === 'All' 
+    ? segments 
+    : segments.filter(s => s.vehicleId === selectedVehicle);
   
   return (
     <div style={{
@@ -59,13 +66,33 @@ export default function Sidebar({ data, loading, onOptimize, onMidDayOptimize })
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Total Distance</span>
-            <span style={{ fontWeight: 600 }}>{data?.totalDistance?.toFixed(1) || 0} km</span>
+            <span style={{ fontWeight: 600 }}>{data?.totalDistanceKm?.toFixed(1) || 0} km</span>
           </div>
         </div>
       </div>
 
       <div style={{ flexGrow: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <h3 style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeline</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>Timeline</h3>
+          
+          {segments.length > 0 && (
+            <select 
+              value={selectedVehicle} 
+              onChange={e => setSelectedVehicle(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                fontSize: '12px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {vehicles.map(v => <option key={v} value={v}>{v === 'All' ? 'All Vehicles' : v}</option>)}
+            </select>
+          )}
+        </div>
         
         {segments.length === 0 && !loading && (
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '40px' }}>
@@ -75,7 +102,7 @@ export default function Sidebar({ data, loading, onOptimize, onMidDayOptimize })
           </div>
         )}
 
-        {segments.map((seg, idx) => {
+        {filteredSegments.map((seg, idx) => {
           let isCommute = seg.type === 'TRANSFER' && (seg.profitOrCost > -20 || -100 > seg.profitOrCost);
           let displayType = isCommute ? 'COMMUTE' : seg.type;
           
