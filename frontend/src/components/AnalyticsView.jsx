@@ -74,12 +74,12 @@ export default function AnalyticsView() {
     <div style={{ height: '100%', overflowY: 'auto', padding: '32px 40px', background: 'var(--bg-primary)' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '28px', marginBottom: '6px' }}>Risk Analytics</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', fontSize: '14px' }}>
           Monte Carlo Simulation · {distribution.length} iterations · Traffic &amp; breakdown variability
         </p>
 
-        {/* KPI Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+        {/* KPI Grid — always 2x2 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '24px' }}>
           <StatCard icon={TrendingUp} label="Baseline (no lookahead)" value={`${Math.round(baselineProfit).toLocaleString()} ₴`} />
           <StatCard icon={Zap} label="Smart optimizer profit" value={`${Math.round(smartProfit).toLocaleString()} ₴`} color="var(--accent-blue)" />
           <StatCard icon={Activity} label="Expected (risk-adjusted)" value={`${Math.round(expectedValue).toLocaleString()} ₴`} color="var(--success)" />
@@ -113,9 +113,9 @@ export default function AnalyticsView() {
                 tickFormatter={v => v.toLocaleString()} />
               <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: '13px' }}
                 formatter={v => [`${Number(v).toLocaleString()} ₴`, 'Profit']} />
-              <ReferenceLine y={expectedValue} stroke="var(--success)" strokeDasharray="5 4" label={{ value: 'Expected', position: 'insideTopRight', fontSize: 11, fill: 'var(--success)' }} />
-              <Line type="monotone" dataKey="profit" stroke="var(--accent-blue)" strokeWidth={2.5} dot={false}
-                activeDot={{ r: 5, fill: 'var(--accent-blue)', stroke: 'white', strokeWidth: 2 }} />
+              <ReferenceLine y={expectedValue} stroke="#34c759" strokeDasharray="5 4" strokeWidth={1.5} />
+              <Line type="monotone" dataKey="profit" stroke="#007aff" strokeWidth={2.5} dot={false}
+                activeDot={{ r: 5, fill: '#007aff', stroke: 'white', strokeWidth: 2 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

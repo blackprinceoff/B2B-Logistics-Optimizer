@@ -4,48 +4,40 @@ import Dashboard from './components/Dashboard';
 import AnalyticsView from './components/AnalyticsView';
 import './index.css';
 
-function Navbar() {
+function NavLink({ to, icon: Icon, label }) {
   const location = useLocation();
-  
+  const active = location.pathname === to;
   return (
-    <nav className="glass-panel" style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '0 24px',
-      height: '60px',
-      position: 'relative',
-      zIndex: 1000
+    <Link to={to} style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '7px 14px', borderRadius: '999px', textDecoration: 'none',
+      color: active ? '#007aff' : '#86868b',
+      background: active ? 'rgba(0,122,255,0.08)' : 'transparent',
+      fontWeight: 500, fontSize: '13px', transition: 'all 0.15s',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '18px' }}>
-        <Truck size={24} color="var(--accent-blue)" />
-        <span>B2B Logistics <span style={{ color: 'var(--text-secondary)' }}>Pro</span></span>
+      <Icon size={15} />
+      {label}
+    </Link>
+  );
+}
+
+function Navbar() {
+  return (
+    <nav style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '0 24px', height: '54px',
+      background: 'rgba(255,255,255,0.88)',
+      backdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(0,0,0,0.08)',
+      position: 'relative', zIndex: 1000,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>
+        <Truck size={22} color="#007aff" />
+        <span>B2B Logistics <span style={{ color: '#86868b', fontWeight: 400 }}>Pro</span></span>
       </div>
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <Link 
-          to="/" 
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '8px 16px', borderRadius: '980px', textDecoration: 'none',
-            color: location.pathname === '/' ? 'var(--accent-blue)' : 'var(--text-secondary)',
-            background: location.pathname === '/' ? 'rgba(0,122,255,0.1)' : 'transparent',
-            fontWeight: 500, fontSize: '14px', transition: 'all 0.2s'
-          }}
-        >
-          <Truck size={18} /> Routing Map
-        </Link>
-        <Link 
-          to="/analytics" 
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '8px 16px', borderRadius: '980px', textDecoration: 'none',
-            color: location.pathname === '/analytics' ? 'var(--accent-blue)' : 'var(--text-secondary)',
-            background: location.pathname === '/analytics' ? 'rgba(0,122,255,0.1)' : 'transparent',
-            fontWeight: 500, fontSize: '14px', transition: 'all 0.2s'
-          }}
-        >
-          <BarChart3 size={18} /> Analytics
-        </Link>
+      <div style={{ display: 'flex', gap: '4px' }}>
+        <NavLink to="/" icon={Truck} label="Routing Map" />
+        <NavLink to="/analytics" icon={BarChart3} label="Analytics" />
       </div>
     </nav>
   );
@@ -54,9 +46,9 @@ function Navbar() {
 function App() {
   return (
     <Router>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <Navbar />
-        <div style={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ flexGrow: 1, overflow: 'hidden' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/analytics" element={<AnalyticsView />} />
