@@ -2,6 +2,7 @@ package com.logistics.controller;
 
 import com.logistics.dto.OptimizationResponse;
 import com.logistics.dto.MidDayOptimizationRequest;
+import com.logistics.model.Location;
 import com.logistics.model.RouteSegment;
 import com.logistics.service.CsvDataLoaderService;
 import com.logistics.service.SmartGraphOptimizationStrategy;
@@ -25,6 +26,11 @@ public class LogisticsController {
     private final SmartGraphOptimizationStrategy optimizationStrategy;
 
     private final Set<String> brokenVehicles = new HashSet<>();
+
+    @GetMapping("/locations")
+    public List<Location> getLocations() {
+        return dataLoader.getLocations();
+    }
 
     @GetMapping("/optimize")
     public OptimizationResponse getSchedule() {

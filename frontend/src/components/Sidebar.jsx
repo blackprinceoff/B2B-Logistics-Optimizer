@@ -1,13 +1,6 @@
 import React from 'react';
 import { Play, RefreshCcw, Activity, MapPin, CalendarClock } from 'lucide-react';
 
-const LOCATIONS = {
-  "1": "Гараж (Городоцька)", "2": "Залізничний вокзал", "3": "Оперний театр",
-  "4": "Аеропорт", "5": "Сихів (Шувар)", "6": "King Cross",
-  "7": "Політехніка", "8": "IT Park", "9": "Forum Lviv",
-  "10": "Високий Замок", "11": "Епіцентр (Кільцева)", "12": "Винники (Госпіталь)"
-};
-
 const TYPE_COLOR = {
   ORDER: '#34c759', TRANSFER: '#007aff', WAITING: '#ff9f0a',
   BREAKDOWN: '#ff3b30', COMMUTE: '#8e8e93',
@@ -18,7 +11,7 @@ const TYPE_LABEL = {
   BREAKDOWN: 'Breakdown', COMMUTE: 'Commute',
 };
 
-function SegmentCard({ seg }) {
+function SegmentCard({ seg, locationMap }) {
   const isCommute = seg.vehicleId === 'COMMUTE' ||
     (seg.type === 'TRANSFER' && seg.profitOrCost < -40);
   const displayType = isCommute ? 'COMMUTE' : seg.type;
@@ -27,8 +20,8 @@ function SegmentCard({ seg }) {
 
   const timeStart = seg.startTime?.split('T')[1]?.substr(0, 5) ?? '--:--';
   const timeEnd   = seg.endTime?.split('T')[1]?.substr(0, 5)   ?? '--:--';
-  const locStart  = LOCATIONS[seg.startLocationId] ?? 'Depot';
-  const locEnd    = LOCATIONS[seg.endLocationId]   ?? 'Depot';
+  const locStart  = locationMap[seg.startLocationId]?.name ?? `Loc ${seg.startLocationId}`;
+  const locEnd    = locationMap[seg.endLocationId]?.name   ?? `Loc ${seg.endLocationId}`;
   const vehicleLabel = seg.vehicleId === 'COMMUTE' 
     ? (seg.driverId ?? '') 
     : (seg.vehicleId ?? '');
@@ -90,7 +83,7 @@ function SegmentCard({ seg }) {
   );
 }
 
-export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selectedVehicle, setSelectedVehicle }) {
+export default function Sidebar({ data, loading, locationMap, onOptimize, onOpenMidDay, selectedVehicle, setSelectedVehicle }) {
   const segments = data?.schedule ?? [];
   const profit   = data?.totalProfit ?? 0;
 
@@ -222,7 +215,7 @@ export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selec
         )}
 
         {/* Segment cards */}
-        {!loading && filtered.map((seg, idx) => <SegmentCard key={idx} seg={seg} />)}
+        {!loading && filtered.map((seg, idx) => <SegmentCard key={idx} seg={seg} locationMap={locationMap} />)}
       </div>
     </div>
   );

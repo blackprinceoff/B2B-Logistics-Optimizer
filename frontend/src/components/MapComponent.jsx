@@ -3,113 +3,105 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Fix Leaflet's default icon path issues in React
+// Fix Leaflet's default icon path issues in Vite/React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const locations = {
-  "1":  { lat: 49.8294, lng: 23.9963, name: "Гараж (Городоцька)" },
-  "2":  { lat: 49.8399, lng: 24.0020, name: "Залізничний вокзал" },
-  "3":  { lat: 49.8438, lng: 24.0272, name: "Оперний театр" },
-  "4":  { lat: 49.8125, lng: 23.9561, name: "Аеропорт Львів" },
-  "5":  { lat: 49.7930, lng: 24.0475, name: "Сихів (Шувар)" },
-  "6":  { lat: 49.7842, lng: 23.9640, name: "King Cross" },
-  "7":  { lat: 49.8403, lng: 24.0155, name: "Політехніка" },
-  "8":  { lat: 49.8227, lng: 24.0298, name: "IT Park (Стрийська)" },
-  "9":  { lat: 49.8420, lng: 24.0375, name: "Forum Lviv" },
-  "10": { lat: 49.8488, lng: 24.0447, name: "Високий Замок" },
-  "11": { lat: 49.8711, lng: 24.0027, name: "Епіцентр (Кільцева)" },
-  "12": { lat: 49.8192, lng: 24.1367, name: "Винники (Госпіталь)" },
-};
-
-// Custom minimal marker for locations
 const dotIcon = new L.DivIcon({
   className: 'custom-dot-icon',
-  html: '<div style="width: 12px; height: 12px; background: #fff; border: 3px solid #1d1d1f; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>',
+  html: '<div style="width:12px;height:12px;background:#fff;border:3px solid #1d1d1f;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>',
   iconSize: [12, 12],
-  iconAnchor: [6, 6]
+  iconAnchor: [6, 6],
 });
 
+const getPathOptions = (seg) => {
+  if (seg.vehicleId === 'COMMUTE')           return { color: '#8e8e93', weight: 2, dashArray: '4, 6', opacity: 0.5 };
+  if (seg.type === 'ORDER')                  return { color: '#34c759', weight: 4, opacity: 0.85 };
+  if (seg.type === 'TRANSFER')               return { color: '#007aff', weight: 3, dashArray: '8, 8', opacity: 0.7 };
+  return { color: '#8e8e93', weight: 2, opacity: 0.5 };
+};
+
+/**
+ * Fetches real road geometry from OSRM for a single segment.
+ * Falls back to a straight line if the request fails or is rate-limited.
+ */
+async function fetchRoadGeometry(startLoc, endLoc, fallbackCoords) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${startLoc.lng},${startLoc.lat};${endLoc.lng},${endLoc.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) return fallbackCoords;
+    const json = await res.json();
+    if (json.routes?.length > 0) {
+      return json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    }
+  } catch (_) { /* fall through */ }
+  return fallbackCoords;
+}
+
 export default function MapComponent({ scheduleData, selectedVehicle }) {
+  // locationMap: { id -> { lat, lng, name } } — loaded from backend API, NOT hardcoded
+  const [locationMap, setLocationMap] = useState({});
   const [routes, setRoutes] = useState([]);
 
+  // Load locations from backend once on mount
   useEffect(() => {
-    if (!scheduleData?.schedule) return;
+    fetch('/api/locations')
+      .then(r => r.json())
+      .then(list => {
+        const map = {};
+        list.forEach(loc => {
+          map[loc.id] = { lat: loc.latitude, lng: loc.longitude, name: loc.name };
+        });
+        setLocationMap(map);
+      })
+      .catch(err => console.error('Failed to load locations from API:', err));
+  }, []);
 
-    const fetchGeometries = async () => {
-      const filteredSchedule = selectedVehicle === 'All' 
-        ? scheduleData.schedule 
-        : scheduleData.schedule.filter(s => s.vehicleId === selectedVehicle);
+  // Draw routes whenever schedule or filter changes
+  useEffect(() => {
+    if (!scheduleData?.schedule || Object.keys(locationMap).length === 0) return;
 
-      // 1. Instantly draw straight lines for all routes
-      const initialRoutes = filteredSchedule.map(seg => {
-        const start = locations[seg.startLocationId];
-        const end = locations[seg.endLocationId];
-        if (!start || !end) return null;
-        if (start === end && seg.type === 'BREAKDOWN') return { type: 'BREAKDOWN', start, vehicleId: seg.vehicleId };
-        return { ...seg, coords: [[start.lat, start.lng], [end.lat, end.lng]] };
-      }).filter(Boolean);
+    const filtered = selectedVehicle === 'All'
+      ? scheduleData.schedule
+      : scheduleData.schedule.filter(s => s.vehicleId === selectedVehicle);
 
-      // We don't set initial straight lines to avoid the "spiderweb" effect.
-      // Instead, we will animate them appearing one by one.
+    const drawRoutes = async () => {
       setRoutes([]);
 
-      // 2. Fetch actual road geometries sequentially and update incrementally
-      for (let i = 0; i < initialRoutes.length; i++) {
-        const route = initialRoutes[i];
-        
-        if (route.type === 'BREAKDOWN') {
-          setRoutes(prev => [...prev, route]);
+      for (const seg of filtered) {
+        const start = locationMap[seg.startLocationId];
+        const end   = locationMap[seg.endLocationId];
+
+        if (!start || !end) continue;
+
+        // Static locations (WAITING/BREAKDOWN): no line needed, just a marker
+        if (seg.type === 'BREAKDOWN') {
+          setRoutes(prev => [...prev, { ...seg, _isBreakdown: true, _pos: [start.lat, start.lng] }]);
           continue;
         }
-        
-        const start = locations[route.startLocationId];
-        const end = locations[route.endLocationId];
-        
+
+        // Same start/end = waiting segment — skip drawing
         if (start.lat === end.lat && start.lng === end.lng) continue;
 
-        try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          if (!res.ok) {
-            // On rate limit, just add the straight line
-            setRoutes(prev => [...prev, route]);
-            continue;
-          }
-          const json = await res.json();
-          if (json.routes && json.routes.length > 0) {
-            const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            setRoutes(prev => [...prev, { ...route, coords }]);
-          } else {
-            setRoutes(prev => [...prev, route]);
-          }
-        } catch (e) {
-          // keep straight line if fetch fails
-          setRoutes(prev => [...prev, route]);
-        }
+        const straightLine = [[start.lat, start.lng], [end.lat, end.lng]];
+        const coords = await fetchRoadGeometry(start, end, straightLine);
+        setRoutes(prev => [...prev, { ...seg, coords }]);
       }
     };
 
-    fetchGeometries();
-  }, [scheduleData, selectedVehicle]);
-
-  const getPathOptions = (seg) => {
-    if (seg.type === 'ORDER') return { color: '#34c759', weight: 4, opacity: 0.8 };
-    if (seg.type === 'TRANSFER' && seg.profitOrCost < -100) return { color: '#8e8e93', weight: 3, dashArray: '5, 8', opacity: 0.6 }; // Commute
-    if (seg.type === 'TRANSFER') return { color: '#007aff', weight: 3, dashArray: '8, 8', opacity: 0.7 };
-    return { color: '#8e8e93', weight: 2 };
-  };
+    drawRoutes();
+  }, [scheduleData, selectedVehicle, locationMap]);
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}>
-      <MapContainer 
-        center={[49.825, 24.02]} 
-        zoom={12} 
-        style={{ height: '100%', width: '100%', background: '#e5e5ea' }}
+      <MapContainer
+        center={[49.833, 24.013]}
+        zoom={12}
+        style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
         <TileLayer
@@ -117,7 +109,8 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
           url='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
         />
 
-        {Object.values(locations).map((loc, idx) => (
+        {/* Location markers — sourced from backend */}
+        {Object.values(locationMap).map((loc, idx) => (
           <Marker key={idx} position={[loc.lat, loc.lng]} icon={dotIcon}>
             <Popup>
               <span style={{ fontWeight: 600, fontSize: '14px' }}>{loc.name}</span>
@@ -125,22 +118,23 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
           </Marker>
         ))}
 
+        {/* Route polylines + breakdown markers */}
         {routes.map((r, idx) => {
-          if (r.type === 'BREAKDOWN') {
+          if (r._isBreakdown) {
             return (
-              <Marker key={idx} position={[r.start.lat, r.start.lng]}>
-                <Popup><b style={{ color: 'var(--danger)' }}>BREAKDOWN!</b><br/>{r.vehicleId}</Popup>
+              <Marker key={idx} position={r._pos}>
+                <Popup><b style={{ color: '#ff3b30' }}>BREAKDOWN!</b><br />{r.vehicleId}</Popup>
               </Marker>
             );
           }
           return (
             <Polyline key={idx} positions={r.coords} pathOptions={getPathOptions(r)}>
               <Popup>
-                <div style={{ fontSize: '13px' }}>
-                  <b style={{ textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>{r.type}</b>
-                  <div style={{ marginTop: '4px', fontWeight: 600 }}>{r.vehicleId}</div>
-                  <div style={{ color: r.profitOrCost >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {r.profitOrCost > 0 ? '+' : ''}{r.profitOrCost.toFixed(2)} ₴
+                <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
+                  <b style={{ textTransform: 'uppercase', fontSize: '11px', color: '#86868b' }}>{r.type}</b>
+                  <div style={{ fontWeight: 600 }}>{r.vehicleId}</div>
+                  <div style={{ color: r.profitOrCost >= 0 ? '#34c759' : '#ff3b30' }}>
+                    {r.profitOrCost > 0 ? '+' : ''}{r.profitOrCost?.toFixed(2)} ₴
                   </div>
                 </div>
               </Popup>
