@@ -54,32 +54,42 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
         return { ...seg, coords: [[start.lat, start.lng], [end.lat, end.lng]] };
       }).filter(Boolean);
 
-      setRoutes([...initialRoutes]);
+      // We don't set initial straight lines to avoid the "spiderweb" effect.
+      // Instead, we will animate them appearing one by one.
+      setRoutes([]);
 
-      // 2. Fetch actual road geometries sequentially (to avoid OSRM rate limits) and update incrementally
+      // 2. Fetch actual road geometries sequentially and update incrementally
       for (let i = 0; i < initialRoutes.length; i++) {
         const route = initialRoutes[i];
-        if (route.type === 'BREAKDOWN') continue;
+        
+        if (route.type === 'BREAKDOWN') {
+          setRoutes(prev => [...prev, route]);
+          continue;
+        }
         
         const start = locations[route.startLocationId];
         const end = locations[route.endLocationId];
+        
         if (start.lat === end.lat && start.lng === end.lng) continue;
 
         try {
           const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
           const res = await fetch(url);
-          if (!res.ok) continue; // Skip on rate limit
+          if (!res.ok) {
+            // On rate limit, just add the straight line
+            setRoutes(prev => [...prev, route]);
+            continue;
+          }
           const json = await res.json();
           if (json.routes && json.routes.length > 0) {
             const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            setRoutes(prev => {
-              const updated = [...prev];
-              updated[i] = { ...updated[i], coords };
-              return updated;
-            });
+            setRoutes(prev => [...prev, { ...route, coords }]);
+          } else {
+            setRoutes(prev => [...prev, route]);
           }
         } catch (e) {
           // keep straight line if fetch fails
+          setRoutes(prev => [...prev, route]);
         }
       }
     };

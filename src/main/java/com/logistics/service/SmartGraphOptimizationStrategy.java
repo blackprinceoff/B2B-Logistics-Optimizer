@@ -29,7 +29,7 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
     // Configuration
     private static final double BREAKDOWN_CHANCE = 0.01;
     private static final double NO_SHOW_CHANCE = 0.03;
-    
+
     // Commute
     private static final double PUBLIC_TRANSPORT_COST = 15.0;
     private static final double OWN_CAR_COST_PER_KM = 4.0;
@@ -40,7 +40,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
     private final Random random = new Random(12345);
 
     @Override
-    public List<RouteSegment> optimize(List<Order> orders, List<Vehicle> vehicles, List<Driver> drivers, Set<String> brokenVehicleIds) {
+    public List<RouteSegment> optimize(List<Order> orders, List<Vehicle> vehicles, List<Driver> drivers,
+            Set<String> brokenVehicleIds) {
         List<RouteSegment> schedule = new ArrayList<>();
         Map<String, Location> locationMap = dataLoader.getLocations().stream()
                 .collect(Collectors.toMap(Location::getId, loc -> loc));
@@ -61,7 +62,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
             Order currentOrder = sortedOrders.get(i);
             List<Order> futureOrders = sortedOrders.subList(Math.min(i + 1, sortedOrders.size()), sortedOrders.size());
 
-            boolean assigned = tryAssignOrder(currentOrder, futureOrders, fleet, schedule, brokenVehicleIds, locationMap, vehicleMap);
+            boolean assigned = tryAssignOrder(currentOrder, futureOrders, fleet, schedule, brokenVehicleIds,
+                    locationMap, vehicleMap);
 
             if (!assigned) {
                 log.warn("Order #{}: CANCELLED (No resources or not profitable)", currentOrder.getId());
@@ -77,7 +79,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return schedule;
     }
 
-    public List<RouteSegment> optimizeMidDay(MidDayOptimizationRequest request, List<Vehicle> allVehicles, List<Driver> allDrivers, Set<String> brokenVehicleIds) {
+    public List<RouteSegment> optimizeMidDay(MidDayOptimizationRequest request, List<Vehicle> allVehicles,
+            List<Driver> allDrivers, Set<String> brokenVehicleIds) {
         List<RouteSegment> schedule = new ArrayList<>();
         Map<String, Location> locationMap = dataLoader.getLocations().stream()
                 .collect(Collectors.toMap(Location::getId, loc -> loc));
@@ -103,7 +106,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         for (int i = 0; i < sortedOrders.size(); i++) {
             Order currentOrder = sortedOrders.get(i);
             List<Order> futureOrders = sortedOrders.subList(Math.min(i + 1, sortedOrders.size()), sortedOrders.size());
-            boolean assigned = tryAssignOrder(currentOrder, futureOrders, fleet, schedule, brokenVehicleIds, locationMap, vehicleMap);
+            boolean assigned = tryAssignOrder(currentOrder, futureOrders, fleet, schedule, brokenVehicleIds,
+                    locationMap, vehicleMap);
             if (!assigned) {
                 log.warn("Order #{}: CANCELLED (No resources or not profitable)", currentOrder.getId());
             }
@@ -125,30 +129,35 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         log.info("Cleanup: Removed drivers with no assigned orders.");
     }
 
-    private boolean tryAssignOrder(Order order, List<Order> futureOrders, List<VehicleState> fleet, List<RouteSegment> schedule, Set<String> brokenVehicleIds, Map<String, Location> locMap, Map<String, Vehicle> vehicleMap) {
+    private boolean tryAssignOrder(Order order, List<Order> futureOrders, List<VehicleState> fleet,
+            List<RouteSegment> schedule, Set<String> brokenVehicleIds, Map<String, Location> locMap,
+            Map<String, Vehicle> vehicleMap) {
         int attempts = 0;
         while (attempts < 3 && !fleet.isEmpty()) {
             attempts++;
-            OptimizationCandidate bestCandidate = findBestCandidate(order, futureOrders, fleet, brokenVehicleIds, locMap);
+            OptimizationCandidate bestCandidate = findBestCandidate(order, futureOrders, fleet, brokenVehicleIds,
+                    locMap);
 
-            if (bestCandidate == null) return false;
+            if (bestCandidate == null)
+                return false;
 
             VehicleState state = bestCandidate.getVehicleState();
 
             if (simulateEvent(BREAKDOWN_CHANCE)) {
                 forceMajeureService.handleBreakdown(state, order, schedule, fleet, brokenVehicleIds);
-                continue; 
+                continue;
             }
 
             if (simulateEvent(NO_SHOW_CHANCE)) {
                 forceMajeureService.handleNoShow(bestCandidate, schedule, order, this, vehicleMap);
-                return true; 
+                return true;
             }
 
             commitAssignment(bestCandidate, schedule, order, vehicleMap);
-            
+
             String strategicNote = bestCandidate.getOpportunityCost() > 0
-                    ? String.format(" [Risk: %.2f]", bestCandidate.getOpportunityCost()) : "";
+                    ? String.format(" [Risk: %.2f]", bestCandidate.getOpportunityCost())
+                    : "";
             log.info("Order #{} -> {} (Profit: %.2f){}",
                     order.getId(), state.getVehicle().getId(), bestCandidate.getNetProfit(), strategicNote);
 
@@ -157,19 +166,24 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return false;
     }
 
-    private OptimizationCandidate findBestCandidate(Order order, List<Order> futureOrders, List<VehicleState> fleet, Set<String> brokenIds, Map<String, Location> locMap) {
+    private OptimizationCandidate findBestCandidate(Order order, List<Order> futureOrders, List<VehicleState> fleet,
+            Set<String> brokenIds, Map<String, Location> locMap) {
         OptimizationCandidate best = null;
-        double maxScore = -1000.0; 
+        double maxScore = -1000.0;
 
         for (VehicleState state : fleet) {
-            if (brokenIds.contains(state.getVehicle().getId())) continue;
-            if (state.getVehicle().getCapacityKg() < order.getWeightKg()) continue;
+            if (brokenIds.contains(state.getVehicle().getId()))
+                continue;
+            if (state.getVehicle().getCapacityKg() < order.getWeightKg())
+                continue;
 
             CalculationResult calc = profitCalculatorService.calculateLogistics(state, order, locMap);
-            if (!calc.isValid()) continue;
+            if (!calc.isValid())
+                continue;
 
             double currentProfit = profitCalculatorService.calculateNetProfit(order, state, calc, locMap);
-            double opportunityCost = profitCalculatorService.calculateOpportunityCost(state, calc, futureOrders, lookAheadMinutes);
+            double opportunityCost = profitCalculatorService.calculateOpportunityCost(state, calc, futureOrders,
+                    lookAheadMinutes);
             double strategicScore = currentProfit - opportunityCost;
 
             if (strategicScore > maxScore) {
@@ -179,11 +193,13 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
                         .netProfit(currentProfit).opportunityCost(opportunityCost).build();
             }
         }
-        if (maxScore <= -1000.0) return null;
+        if (maxScore <= -1000.0)
+            return null;
         return best;
     }
 
-    private void commitAssignment(OptimizationCandidate candidate, List<RouteSegment> schedule, Order order, Map<String, Vehicle> vehicleMap) {
+    private void commitAssignment(OptimizationCandidate candidate, List<RouteSegment> schedule, Order order,
+            Map<String, Vehicle> vehicleMap) {
         VehicleState state = candidate.getVehicleState();
         CalculationResult calc = candidate.getCalculation();
 
@@ -205,16 +221,19 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         state.setWorkedMinutesWithoutBreak(state.getWorkedMinutesWithoutBreak() + calc.getOrderTime());
     }
 
-    public void addSupportSegments(VehicleState state, CalculationResult calc, List<RouteSegment> schedule, String destId, Map<String, Vehicle> vehicleMap) {
+    public void addSupportSegments(VehicleState state, CalculationResult calc, List<RouteSegment> schedule,
+            String destId, Map<String, Vehicle> vehicleMap) {
         if (calc.getBreakTime() > 0) {
-            schedule.add(createSegment(state, SegmentType.WAITING, state.getCurrentLocationId(), state.getCurrentLocationId(),
+            schedule.add(createSegment(state, SegmentType.WAITING, state.getCurrentLocationId(),
+                    state.getCurrentLocationId(),
                     state.getAvailableFrom(), calc.getBreakTime(), 0, 0));
             state.setAvailableFrom(state.getAvailableFrom().plusMinutes(calc.getBreakTime()));
             state.setWorkedMinutesWithoutBreak(0);
         }
         if (calc.getIdleTime() > 0) {
             double cost = (calc.getIdleTime() / 60.0) * state.getDriver().getHourlyRate();
-            schedule.add(createSegment(state, SegmentType.WAITING, state.getCurrentLocationId(), state.getCurrentLocationId(),
+            schedule.add(createSegment(state, SegmentType.WAITING, state.getCurrentLocationId(),
+                    state.getCurrentLocationId(),
                     state.getAvailableFrom(), calc.getIdleTime(), 0, -cost));
             state.setAvailableFrom(state.getAvailableFrom().plusMinutes(calc.getIdleTime()));
         }
@@ -230,22 +249,24 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         }
     }
 
-    private boolean tryCarpooling(VehicleState state, CalculationResult calc, List<RouteSegment> schedule, String destId, Map<String, Vehicle> vehicleMap) {
+    private boolean tryCarpooling(VehicleState state, CalculationResult calc, List<RouteSegment> schedule,
+            String destId, Map<String, Vehicle> vehicleMap) {
         if (!"MOTORCYCLE".equals(state.getVehicle().getType()) || calc.getTransferDist() < 5.0) {
-            return false; 
+            return false;
         }
 
         for (RouteSegment seg : schedule) {
             Vehicle candidateVehicle = vehicleMap.get(seg.getVehicleId());
-            if (candidateVehicle == null || seg.getVehicleId().equals(state.getVehicle().getId())) continue;
+            if (candidateVehicle == null || seg.getVehicleId().equals(state.getVehicle().getId()))
+                continue;
 
             if ("MINIVAN".equals(candidateVehicle.getType())) {
                 if (seg.getStartTime().isBefore(state.getAvailableFrom().plusMinutes(15)) &&
-                    seg.getEndTime().isAfter(state.getAvailableFrom())) {
-                    
-                    log.info("Dynamic Workforce Routing: Driver {} (scooter) carpools with {} to {}", 
+                        seg.getEndTime().isAfter(state.getAvailableFrom())) {
+
+                    log.info("Dynamic Workforce Routing: Driver {} (scooter) carpools with {} to {}",
                             state.getDriver().getId(), seg.getVehicleId(), destId);
-                            
+
                     double salary = (calc.getTransferTime() / 60.0) * state.getDriver().getHourlyRate();
                     schedule.add(createSegment(state, SegmentType.TRANSFER, state.getCurrentLocationId(), destId,
                             state.getAvailableFrom(), calc.getTransferTime(), calc.getTransferDist(), -salary));
@@ -257,9 +278,10 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return false;
     }
 
-    private List<VehicleState> initializeFleet(List<Vehicle> vehicles, List<Driver> drivers, Set<String> brokenIds, List<RouteSegment> schedule, Map<String, Location> locMap) {
+    private List<VehicleState> initializeFleet(List<Vehicle> vehicles, List<Driver> drivers, Set<String> brokenIds,
+            List<RouteSegment> schedule, Map<String, Location> locMap) {
         List<VehicleState> fleet = new ArrayList<>();
-        
+
         Map<String, List<Driver>> carpoolGroups = new HashMap<>();
         for (Driver d : drivers) {
             String key = d.getStartLocationId() + "_" + d.getShiftStart().getHour();
@@ -268,23 +290,26 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
 
         int driverIndex = 0;
         for (Vehicle v : vehicles) {
-            if (brokenIds.contains(v.getId())) continue;
+            if (brokenIds.contains(v.getId()))
+                continue;
             Driver driver = (driverIndex < drivers.size()) ? drivers.get(driverIndex) : drivers.get(0);
             driverIndex++;
 
             Location driverHome = locMap.get(driver.getStartLocationId());
             Location vehicleGarage = locMap.get(v.getStartLocationId());
-            LocalDateTime shiftStart = LocalDateTime.of(2025, 6, 20, driver.getShiftStart().getHour(), driver.getShiftStart().getMinute());
+            LocalDateTime shiftStart = LocalDateTime.of(2025, 6, 20, driver.getShiftStart().getHour(),
+                    driver.getShiftStart().getMinute());
 
             double commuteDist = distanceService.getDistanceKm(driverHome, vehicleGarage);
-            double ownCarTimeDouble = distanceService.getTravelTimeMinutes(driverHome, vehicleGarage, shiftStart.minusMinutes(60));
+            double ownCarTimeDouble = distanceService.getTravelTimeMinutes(driverHome, vehicleGarage,
+                    shiftStart.minusMinutes(60));
             long ownCarTime = (long) Math.ceil(ownCarTimeDouble);
             long publicTransportTime = (long) (ownCarTime * PUBLIC_TRANSPORT_TIME_FACTOR);
 
             String groupKey = driver.getStartLocationId() + "_" + driver.getShiftStart().getHour();
             List<Driver> group = carpoolGroups.get(groupKey);
             boolean isPassenger = false;
-            
+
             if (group != null && group.size() > 1 && group.indexOf(driver) > 0) {
                 isPassenger = true;
             }
@@ -310,9 +335,9 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
             }
 
             LocalDateTime commuteStart = shiftStart.minusMinutes(finalCommuteTime);
-            
+
             schedule.add(RouteSegment.builder()
-                    .vehicleId("COMMUTE") 
+                    .vehicleId("COMMUTE")
                     .driverId(driver.getId())
                     .type(SegmentType.TRANSFER)
                     .startLocationId(driver.getStartLocationId())
@@ -328,7 +353,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return fleet;
     }
 
-    private void returnFleetToDepotAndHome(List<VehicleState> fleet, List<RouteSegment> schedule, Map<String, Location> locMap) {
+    private void returnFleetToDepotAndHome(List<VehicleState> fleet, List<RouteSegment> schedule,
+            Map<String, Location> locMap) {
         log.info("--- SHIFT END ---");
         for (VehicleState state : fleet) {
             Location current = locMap.get(state.getCurrentLocationId());
@@ -337,30 +363,33 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
             LocalDateTime garageArrivalTime = state.getAvailableFrom();
 
             if (dist > 0.1) {
-                long time = (long) Math.ceil(distanceService.getTravelTimeMinutes(current, garage, state.getAvailableFrom()));
+                long time = (long) Math
+                        .ceil(distanceService.getTravelTimeMinutes(current, garage, state.getAvailableFrom()));
                 double salary = (time / 60.0) * state.getDriver().getHourlyRate();
                 double fuel = dist * state.getVehicle().getCostPerKm() * 1.1;
-                schedule.add(createSegment(state, SegmentType.TRANSFER, state.getCurrentLocationId(), state.getVehicle().getStartLocationId(),
+                schedule.add(createSegment(state, SegmentType.TRANSFER, state.getCurrentLocationId(),
+                        state.getVehicle().getStartLocationId(),
                         state.getAvailableFrom(), time, dist, -(salary + fuel)));
                 garageArrivalTime = state.getAvailableFrom().plusMinutes(time);
             }
 
             Location home = locMap.get(state.getDriver().getStartLocationId());
             double commuteDist = distanceService.getDistanceKm(garage, home);
-            
+
             double commuteCost;
             long commuteTime;
-            
+
             if (commuteDist < 1.0) {
                 commuteCost = 0.0;
                 commuteTime = (long) (commuteDist * 12.0);
             } else {
-                commuteCost = PUBLIC_TRANSPORT_COST; 
-                commuteTime = (long) (distanceService.getTravelTimeMinutes(garage, home, garageArrivalTime) * PUBLIC_TRANSPORT_TIME_FACTOR);
+                commuteCost = PUBLIC_TRANSPORT_COST;
+                commuteTime = (long) (distanceService.getTravelTimeMinutes(garage, home, garageArrivalTime)
+                        * PUBLIC_TRANSPORT_TIME_FACTOR);
             }
 
             schedule.add(RouteSegment.builder()
-                    .vehicleId("COMMUTE") 
+                    .vehicleId("COMMUTE")
                     .driverId(state.getDriver().getId())
                     .type(SegmentType.TRANSFER)
                     .startLocationId(state.getVehicle().getStartLocationId())
@@ -377,7 +406,10 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return random.nextDouble() < chance;
     }
 
-    public RouteSegment createSegment(VehicleState s, SegmentType type, String startId, String endId, LocalDateTime start, long duration, double dist, double cost) {
-        return RouteSegment.builder().vehicleId(s.getVehicle().getId()).driverId(s.getDriver().getId()).type(type).startLocationId(startId).endLocationId(endId).startTime(start).endTime(start.plusMinutes(duration)).distanceKm(dist).profitOrCost(cost).build();
+    public RouteSegment createSegment(VehicleState s, SegmentType type, String startId, String endId,
+            LocalDateTime start, long duration, double dist, double cost) {
+        return RouteSegment.builder().vehicleId(s.getVehicle().getId()).driverId(s.getDriver().getId()).type(type)
+                .startLocationId(startId).endLocationId(endId).startTime(start).endTime(start.plusMinutes(duration))
+                .distanceKm(dist).profitOrCost(cost).build();
     }
 }
