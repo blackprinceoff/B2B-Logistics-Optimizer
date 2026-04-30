@@ -46,28 +46,30 @@ function SegmentCard({ seg }) {
         background: color, borderRadius: '4px 0 0 4px',
       }} />
 
-      <div style={{ padding: '12px 12px 12px 15px' }}>
-        {/* Row 1: Badge + Vehicle */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div style={{ padding: '13px 14px 13px 16px' }}>
+
+        {/* Row 1: Badge (left) ↔ Vehicle ID (right) — space-between + center */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
           <span style={{
-            display: 'inline-block', padding: '3px 9px', borderRadius: '999px',
-            fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px',
-            background: `${color}18`, color,
+            display: 'inline-flex', alignItems: 'center',
+            padding: '4px 10px', borderRadius: '999px',
+            fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
+            background: `${color}1A`, color,
           }}>{label}</span>
           <span style={{ fontSize: '11px', color: '#86868b', fontWeight: 600 }}>{vehicleLabel}</span>
         </div>
 
-        {/* Row 2: Route */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '10px' }}>
-          <MapPin size={13} color="#8e8e93" style={{ marginTop: '2px', flexShrink: 0 }} />
+        {/* Row 2: Pin icon (with margin-right) + Route text */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '10px' }}>
+          <MapPin size={13} color="#8e8e93" style={{ marginTop: '2px', flexShrink: 0, marginRight: '8px' }} />
           <div style={{ fontSize: '13px', fontWeight: 500, color: '#1d1d1f', lineHeight: 1.5 }}>
             {locStart}
-            <span style={{ color: '#8e8e93', margin: '0 4px', fontWeight: 400 }}>→</span>
+            <span style={{ color: '#8e8e93', margin: '0 5px', fontWeight: 400 }}>→</span>
             {locEnd}
           </div>
         </div>
 
-        {/* Row 3: Time · km | profit */}
+        {/* Row 3: Time+km (left) ↔ Profit (right) — space-between + center */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '9px',
@@ -82,6 +84,7 @@ function SegmentCard({ seg }) {
             {seg.profitOrCost > 0 ? '+' : ''}{(seg.profitOrCost ?? 0).toFixed(2)} ₴
           </span>
         </div>
+
       </div>
     </div>
   );
@@ -144,16 +147,17 @@ export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selec
           </button>
         </div>
 
-        {/* Stats card */}
+        {/* Stats card — equal top/bottom padding, gap between profit row and secondary stats */}
         <div style={{
-          background: '#f5f5f7', borderRadius: '12px', padding: '14px 16px',
+          background: '#f5f5f7', borderRadius: '12px', padding: '16px',
           border: '1px solid rgba(0,0,0,0.06)',
         }}>
-          <div style={{ fontSize: '10px', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
             Financial Summary
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#1d1d1f' }}>Net Profit</span>
+          {/* Net Profit — label and value vertically center-aligned */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: '#86868b' }}>Net Profit</span>
             <span style={{
               fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px',
               color: profit > 0 ? '#34c759' : profit < 0 ? '#ff3b30' : '#1d1d1f',
@@ -161,13 +165,16 @@ export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selec
               {profit.toFixed(0)} ₴
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#86868b', marginBottom: '5px' }}>
-            <span>Orders completed</span>
-            <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{data?.completedOrders ?? 0}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#86868b' }}>
-            <span>Total distance</span>
-            <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{(data?.totalDistanceKm ?? 0).toFixed(1)} km</span>
+          {/* Divider before secondary stats */}
+          <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#86868b' }}>
+              <span>Orders completed</span>
+              <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{data?.completedOrders ?? 0}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#86868b' }}>
+              <span>Total distance</span>
+              <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{(data?.totalDistanceKm ?? 0).toFixed(1)} km</span>
+            </div>
           </div>
         </div>
       </div>
@@ -175,9 +182,9 @@ export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selec
       {/* ── Timeline ── */}
       <div style={{ flexGrow: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
-        {/* Timeline header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#86868b' }}>
+        {/* Timeline header — label and dropdown perfectly center-aligned */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '28px', marginBottom: '4px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#86868b', lineHeight: '28px' }}>
             Timeline
           </span>
           {segments.length > 0 && (
@@ -185,10 +192,11 @@ export default function Sidebar({ data, loading, onOptimize, onOpenMidDay, selec
               value={selectedVehicle}
               onChange={e => setSelectedVehicle(e.target.value)}
               style={{
-                padding: '3px 8px', borderRadius: '7px',
+                height: '26px', padding: '0 8px', borderRadius: '7px',
                 border: '1px solid rgba(0,0,0,0.12)',
                 background: '#fff', fontSize: '11px', fontFamily: 'inherit',
                 outline: 'none', cursor: 'pointer', color: '#1d1d1f',
+                display: 'flex', alignItems: 'center',
               }}
             >
               {vehicleIds.map(v => <option key={v} value={v}>{v === 'All' ? 'All Vehicles' : v}</option>)}
