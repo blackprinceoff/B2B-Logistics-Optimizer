@@ -119,6 +119,48 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
         return schedule;
     }
 
+    /**
+     * Runs a partial optimization up to the given midDay time to capture the live fleet state,
+     * then returns a MidDayOptimizationRequest that can be fed into optimizeMidDay().
+     */
+    public MidDayOptimizationRequest extractStateAt(LocalDateTime midDay, List<Order> orders,
+            List<Vehicle> vehicles, List<Driver> drivers, Set<String> brokenVehicleIds) {
+        List<RouteSegment> schedule = new ArrayList<>();
+        Map<String, Location> locationMap = dataLoader.getLocations().stream()
+                .collect(Collectors.toMap(Location::getId, loc -> loc));
+
+        List<Order> sortedOrders = new ArrayList<>(orders);
+        sortedOrders.sort(Comparator.comparing(Order::getPickupTime));
+
+        List<VehicleState> fleet = initializeFleet(vehicles, drivers, brokenVehicleIds, schedule, locationMap);
+        Map<String, Vehicle> vehicleMap = vehicles.stream()
+                .collect(Collectors.toMap(Vehicle::getId, v -> v));
+
+        int stopIndex = sortedOrders.size();
+        for (int i = 0; i < sortedOrders.size(); i++) {
+            Order order = sortedOrders.get(i);
+            if (!order.getPickupTime().isBefore(midDay)) {
+                stopIndex = i;
+                break;
+            }
+            List<Order> future = sortedOrders.subList(Math.min(i + 1, sortedOrders.size()), sortedOrders.size());
+            tryAssignOrder(order, future, fleet, schedule, brokenVehicleIds, locationMap, vehicleMap);
+        }
+
+        List<Order> remaining = new ArrayList<>(sortedOrders.subList(stopIndex, sortedOrders.size()));
+
+        List<MidDayOptimizationRequest.DriverCurrentState> states = fleet.stream()
+                .map(state -> new MidDayOptimizationRequest.DriverCurrentState(
+                        state.getDriver().getId(),
+                        state.getVehicle().getId(),
+                        state.getCurrentLocationId(),
+                        state.getAvailableFrom().isBefore(midDay) ? midDay : state.getAvailableFrom()))
+                .collect(Collectors.toList());
+
+        log.info("Snapshot at {}: {} active drivers, {} remaining orders", midDay, states.size(), remaining.size());
+        return new MidDayOptimizationRequest(midDay, states, remaining);
+    }
+
     private void cleanupUnusedDrivers(List<RouteSegment> schedule) {
         Set<String> activeDrivers = schedule.stream()
                 .filter(s -> s.getType() == SegmentType.ORDER)

@@ -1,68 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import MapComponent from './MapComponent';
 import Sidebar from './Sidebar';
+import MidDayModal from './MidDayModal';
 
 export default function Dashboard() {
   const [scheduleData, setScheduleData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState('All');
+  const [showMidDayModal, setShowMidDayModal] = useState(false);
 
   const handleRunOptimization = async () => {
     setLoading(true);
-    setError(null);
     try {
       const response = await fetch('/api/optimize');
-      if (!response.ok) throw new Error('Failed to fetch schedule');
+      if (!response.ok) throw new Error('Backend error ' + response.status);
       const data = await response.json();
       setScheduleData(data);
+      setSelectedVehicle('All');
     } catch (err) {
-      console.error("Fetch Error:", err);
-      setError(err.message);
+      console.error('Full-day optimization failed:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMidDayReoptimization = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Dummy request for mid-day. In reality, you'd pull real vehicle states.
-      const request = {
-        currentTime: "2025-06-20T14:00:00",
-        driverStates: [],
-        remainingOrders: []
-      };
-      
-      const response = await fetch('/api/reoptimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request)
-      });
-      if (!response.ok) throw new Error('Failed to fetch mid-day schedule');
-      const data = await response.json();
-      setScheduleData(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleMidDayResult = (data) => {
+    setScheduleData(data);
+    setSelectedVehicle('All');
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <Sidebar 
-        data={scheduleData} 
-        loading={loading} 
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <Sidebar
+        data={scheduleData}
+        loading={loading}
         onOptimize={handleRunOptimization}
-        onMidDayOptimize={handleMidDayReoptimization}
+        onOpenMidDay={() => setShowMidDayModal(true)}
         selectedVehicle={selectedVehicle}
         setSelectedVehicle={setSelectedVehicle}
       />
       <div style={{ flexGrow: 1, position: 'relative' }}>
         <MapComponent scheduleData={scheduleData} selectedVehicle={selectedVehicle} />
       </div>
+
+      {showMidDayModal && (
+        <MidDayModal
+          onClose={() => setShowMidDayModal(false)}
+          onResult={handleMidDayResult}
+        />
+      )}
     </div>
   );
 }

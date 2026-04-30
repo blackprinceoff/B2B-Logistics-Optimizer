@@ -1,18 +1,19 @@
 package com.logistics.controller;
 
 import com.logistics.dto.OptimizationResponse;
+import com.logistics.dto.MidDayOptimizationRequest;
 import com.logistics.model.RouteSegment;
-import com.logistics.model.SimulationResult;
 import com.logistics.service.CsvDataLoaderService;
 import com.logistics.service.SmartGraphOptimizationStrategy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import com.logistics.dto.MidDayOptimizationRequest;
 
 @RestController
 @RequestMapping("/api")
@@ -55,6 +56,18 @@ public class LogisticsController {
                 totalDistance
         );
     }
+    @GetMapping("/snapshot")
+    public MidDayOptimizationRequest getSnapshot(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime time) {
+        return optimizationStrategy.extractStateAt(
+                time,
+                dataLoader.getOrders(),
+                dataLoader.getVehicles(),
+                dataLoader.getDrivers(),
+                new HashSet<>(brokenVehicles)
+        );
+    }
+
     @PostMapping("/vehicles/{vehicleId}/breakdown")
     public String reportBreakdown(@PathVariable String vehicleId) {
         brokenVehicles.add(vehicleId);
