@@ -38,6 +38,7 @@ function SegmentCard({ seg }) {
       background: '#fff', borderRadius: '12px',
       border: '1px solid rgba(0,0,0,0.07)',
       position: 'relative', overflow: 'hidden',
+      flexShrink: 0,
     }}>
       {/* Left color bar */}
       <div style={{
