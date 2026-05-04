@@ -1,23 +1,39 @@
 import React from 'react';
-import { Play, RefreshCcw, Activity, MapPin, CalendarClock } from 'lucide-react';
+import { Play, RefreshCcw, Activity, MapPin, CalendarClock, X } from 'lucide-react';
 
-const TYPE_COLOR = {
-  ORDER: '#34c759', TRANSFER: '#007aff', WAITING: '#ff9f0a',
-  BREAKDOWN: '#ff3b30', COMMUTE: '#8e8e93',
-};
+const ROUTE_COLORS = [
+  '#2563EB', '#16A34A', '#DC2626', '#D97706', 
+  '#7C3AED', '#0891B2', '#DB2777', '#65A30D'
+];
 
-const TYPE_LABEL = {
-  ORDER: 'Order', TRANSFER: 'Transfer', WAITING: 'Waiting',
-  BREAKDOWN: 'Breakdown', COMMUTE: 'Commute',
-};
+function SkeletonCard({ index }) {
+  return (
+    <div className="stagger-item" style={{
+      background: '#fff', borderRadius: '12px', padding: '13px 14px 13px 16px',
+      border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: '12px',
+      animationDelay: `${index * 0.08}s`, flexShrink: 0
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="skeleton" style={{ width: '60px', height: '18px', borderRadius: '999px' }} />
+        <div className="skeleton" style={{ width: '45px', height: '14px', borderRadius: '4px' }} />
+      </div>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+        <div className="skeleton" style={{ width: '13px', height: '13px', borderRadius: '50%', marginTop: '2px' }} />
+        <div className="skeleton" style={{ width: '100%', maxWidth: '220px', height: '16px', borderRadius: '4px' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '10px' }}>
+        <div className="skeleton" style={{ width: '110px', height: '12px', borderRadius: '4px' }} />
+        <div className="skeleton" style={{ width: '50px', height: '14px', borderRadius: '4px' }} />
+      </div>
+    </div>
+  );
+}
 
-function SegmentCard({ seg, locationMap }) {
+function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, onClear, index }) {
   const isCommute = seg.vehicleId === 'COMMUTE' ||
     (seg.type === 'TRANSFER' && seg.profitOrCost < -40);
   const displayType = isCommute ? 'COMMUTE' : seg.type;
-  const color = TYPE_COLOR[displayType] || '#8e8e93';
-  const label = TYPE_LABEL[displayType] || displayType;
-
+  
   const timeStart = seg.startTime?.split('T')[1]?.substr(0, 5) ?? '--:--';
   const timeEnd   = seg.endTime?.split('T')[1]?.substr(0, 5)   ?? '--:--';
   const locStart  = locationMap[seg.startLocationId]?.name ?? `Loc ${seg.startLocationId}`;
@@ -26,29 +42,67 @@ function SegmentCard({ seg, locationMap }) {
     ? (seg.driverId ?? '') 
     : (seg.vehicleId ?? '');
 
+  // Calculate hex with opacity for background
+  const hexToRgba = (hex, opacity) => {
+    let r = parseInt(hex.slice(1, 3), 16),
+        g = parseInt(hex.slice(3, 5), 16),
+        b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
+
+  const activeBg = isActive ? hexToRgba(routeColor, 0.1) : '#fff';
+  const leftBorderColor = routeColor;
+
   return (
-    <div style={{
-      background: '#fff', borderRadius: '12px',
-      border: '1px solid rgba(0,0,0,0.07)',
-      position: 'relative', overflow: 'hidden',
-      flexShrink: 0,
-    }}>
+    <div 
+      className="stagger-item"
+      onClick={onToggleActive}
+      style={{
+        background: activeBg, borderRadius: '12px',
+        border: '1px solid rgba(0,0,0,0.07)',
+        position: 'relative', overflow: 'hidden',
+        flexShrink: 0,
+        cursor: 'pointer',
+        transition: 'all 150ms ease',
+        animationDelay: `${index * 0.05}s`
+      }}
+    >
       {/* Left color bar */}
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
-        background: color, borderRadius: '4px 0 0 4px',
+        background: leftBorderColor, borderRadius: '4px 0 0 4px',
+        transition: 'all 150ms ease',
       }} />
 
-      <div style={{ padding: '13px 14px 13px 16px' }}>
+      <div style={{ padding: '13px 14px 13px 16px', position: 'relative' }}>
+        
+        {/* Clear button if active */}
+        {isActive && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            style={{
+              position: 'absolute', top: '10px', right: '10px',
+              background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%',
+              width: '24px', height: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+              cursor: 'pointer', color: '#1d1d1f'
+            }}
+            title="Clear selection"
+          >
+            <X size={14} />
+          </button>
+        )}
 
         {/* Row 1: Badge (left) ↔ Vehicle ID (right) — space-between + center */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px', paddingRight: isActive ? '24px' : '0' }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center',
             padding: '4px 10px', borderRadius: '999px',
             fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-            background: `${color}1A`, color,
-          }}>{label}</span>
+            background: `rgba(0,0,0,0.05)`, color: '#1d1d1f',
+          }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: routeColor, marginRight: '6px' }} />
+            {displayType}
+          </span>
           <span style={{ fontSize: '11px', color: '#86868b', fontWeight: 600 }}>{vehicleLabel}</span>
         </div>
 
@@ -83,7 +137,11 @@ function SegmentCard({ seg, locationMap }) {
   );
 }
 
-export default function Sidebar({ data, loading, locationMap, onOptimize, onOpenMidDay, selectedVehicle, setSelectedVehicle }) {
+export default function Sidebar({ 
+  data, loading, locationMap, onOptimize, onOpenMidDay, 
+  selectedVehicle, setSelectedVehicle,
+  activeRouteId, setActiveRouteId 
+}) {
   const segments = data?.schedule ?? [];
   const profit   = data?.totalProfit ?? 0;
 
@@ -91,32 +149,39 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
     segments.filter(s => s.vehicleId !== 'COMMUTE').map(s => s.vehicleId)
   )].sort();
 
+  // Attach original indices so we can identify them and consistently color them
+  const segmentsWithIndex = segments.map((seg, idx) => ({ ...seg, originalIndex: idx }));
+
   const filtered = selectedVehicle === 'All'
-    ? segments
-    : segments.filter(s => s.vehicleId === selectedVehicle || s.vehicleId === 'COMMUTE');
+    ? segmentsWithIndex
+    : segmentsWithIndex.filter(s => s.vehicleId === selectedVehicle || s.vehicleId === 'COMMUTE');
 
   return (
     <div style={{
       width: '380px', flexShrink: 0, height: '100%',
-      background: 'rgba(255,255,255,0.85)',
-      backdropFilter: 'blur(20px)',
+      background: 'rgba(255, 255, 255, 0.75)',
+      backdropFilter: 'saturate(180%) blur(20px)',
+      WebkitBackdropFilter: 'saturate(180%) blur(20px)',
       borderRight: '1px solid rgba(0,0,0,0.08)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
 
       {/* ── Header ── */}
-      <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
-        <h2 style={{ fontSize: '17px', fontWeight: 700, marginBottom: '12px', letterSpacing: '-0.3px' }}>
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', letterSpacing: '-0.4px', color: '#1d1d1f' }}>
           Dispatch Control
         </h2>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           <button
             className="btn-primary"
             onClick={onOptimize}
             disabled={loading}
-            style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 0', fontSize: '13px' }}
+            style={{ 
+              flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', 
+              height: '36px', padding: '0', fontSize: '13px', fontWeight: 600 
+            }}
           >
             {loading ? <RefreshCcw size={14} className="spin" /> : <Play size={14} />}
             Run Full Day
@@ -127,28 +192,26 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
             disabled={loading}
             style={{
               flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-              padding: '10px 0', borderRadius: '999px',
-              border: '1.5px solid rgba(0,0,0,0.12)',
-              background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: '13px', fontWeight: 500, color: '#1d1d1f', transition: 'background 0.15s',
+              height: '36px', borderRadius: '999px',
+              background: 'rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: '13px', fontWeight: 600, color: '#1d1d1f', transition: 'background 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f5f5f7'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
           >
             <CalendarClock size={14} color="#007aff" />
             Mid-Day Sync
           </button>
         </div>
 
-        {/* Stats card — equal top/bottom padding, gap between profit row and secondary stats */}
+        {/* Stats card */}
         <div style={{
-          background: '#f5f5f7', borderRadius: '12px', padding: '16px',
-          border: '1px solid rgba(0,0,0,0.06)',
+          background: '#ffffff', borderRadius: '14px', padding: '16px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.04)',
         }}>
           <div style={{ fontSize: '10px', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
             Financial Summary
           </div>
-          {/* Net Profit — label and value vertically center-aligned */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <span style={{ fontSize: '13px', color: '#86868b' }}>Net Profit</span>
             <span style={{
@@ -158,7 +221,6 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
               {profit.toFixed(0)} ₴
             </span>
           </div>
-          {/* Divider before secondary stats */}
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#86868b' }}>
               <span>Orders completed</span>
@@ -174,9 +236,7 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
 
       {/* ── Timeline ── */}
       <div style={{ flexGrow: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-
-        {/* Timeline header — label and dropdown perfectly center-aligned */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '28px', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '28px', marginBottom: '4px', flexShrink: 0 }}>
           <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#86868b', lineHeight: '28px' }}>
             Timeline
           </span>
@@ -197,7 +257,6 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
           )}
         </div>
 
-        {/* Empty state */}
         {segments.length === 0 && !loading && (
           <div style={{ textAlign: 'center', color: '#86868b', marginTop: '40px' }}>
             <Activity size={28} style={{ opacity: 0.18, display: 'block', margin: '0 auto 10px' }} />
@@ -206,16 +265,32 @@ export default function Sidebar({ data, loading, locationMap, onOptimize, onOpen
           </div>
         )}
 
-        {/* Loading state */}
         {loading && (
-          <div style={{ textAlign: 'center', color: '#86868b', marginTop: '40px' }}>
-            <RefreshCcw size={24} className="spin" style={{ display: 'block', margin: '0 auto 10px', opacity: 0.4 }} />
-            <p style={{ fontSize: '13px' }}>Optimizing routes…</p>
-          </div>
+          <>
+            <SkeletonCard index={0} />
+            <SkeletonCard index={1} />
+            <SkeletonCard index={2} />
+            <SkeletonCard index={3} />
+          </>
         )}
 
-        {/* Segment cards */}
-        {!loading && filtered.map((seg, idx) => <SegmentCard key={idx} seg={seg} locationMap={locationMap} />)}
+        {!loading && filtered.map((seg, i) => {
+          const routeColor = ROUTE_COLORS[seg.originalIndex % ROUTE_COLORS.length];
+          const isActive = activeRouteId === seg.originalIndex;
+          
+          return (
+            <SegmentCard 
+              key={seg.originalIndex} 
+              seg={seg} 
+              locationMap={locationMap} 
+              routeColor={routeColor}
+              isActive={isActive}
+              onToggleActive={() => setActiveRouteId(isActive ? null : seg.originalIndex)}
+              onClear={() => setActiveRouteId(null)}
+              index={i}
+            />
+          );
+        })}
       </div>
     </div>
   );

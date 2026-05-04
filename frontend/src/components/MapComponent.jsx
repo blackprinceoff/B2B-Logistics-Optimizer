@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -18,12 +18,10 @@ const dotIcon = new L.DivIcon({
   iconAnchor: [6, 6],
 });
 
-const getPathOptions = (seg) => {
-  if (seg.vehicleId === 'COMMUTE')           return { color: '#8e8e93', weight: 2, dashArray: '4, 6', opacity: 0.5 };
-  if (seg.type === 'ORDER')                  return { color: '#34c759', weight: 4, opacity: 0.85 };
-  if (seg.type === 'TRANSFER')               return { color: '#007aff', weight: 3, dashArray: '8, 8', opacity: 0.7 };
-  return { color: '#8e8e93', weight: 2, opacity: 0.5 };
-};
+const ROUTE_COLORS = [
+  '#2563EB', '#16A34A', '#DC2626', '#D97706', 
+  '#7C3AED', '#0891B2', '#DB2777', '#65A30D'
+];
 
 /**
  * Fetches real road geometry from OSRM for a single segment.
@@ -42,10 +40,12 @@ async function fetchRoadGeometry(startLoc, endLoc, fallbackCoords) {
   return fallbackCoords;
 }
 
-export default function MapComponent({ scheduleData, selectedVehicle }) {
+export default function MapComponent({ scheduleData, selectedVehicle, activeRouteId }) {
   // locationMap: { id -> { lat, lng, name } } — loaded from backend API, NOT hardcoded
   const [locationMap, setLocationMap] = useState({});
   const [routes, setRoutes] = useState([]);
+  
+  const polylineRefs = useRef({});
 
   // Load locations from backend once on mount
   useEffect(() => {
@@ -65,12 +65,16 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
   useEffect(() => {
     if (!scheduleData?.schedule || Object.keys(locationMap).length === 0) return;
 
+    // Attach originalIndex to match Sidebar logic
+    const segmentsWithIndex = scheduleData.schedule.map((seg, idx) => ({ ...seg, originalIndex: idx }));
+
     const filtered = selectedVehicle === 'All'
-      ? scheduleData.schedule
-      : scheduleData.schedule.filter(s => s.vehicleId === selectedVehicle);
+      ? segmentsWithIndex
+      : segmentsWithIndex.filter(s => s.vehicleId === selectedVehicle);
 
     const drawRoutes = async () => {
       setRoutes([]);
+      polylineRefs.current = {}; // Reset refs on redraw
 
       for (const seg of filtered) {
         const start = locationMap[seg.startLocationId];
@@ -95,6 +99,29 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
 
     drawRoutes();
   }, [scheduleData, selectedVehicle, locationMap]);
+
+  // Handle activeRouteId changes directly via Leaflet refs
+  useEffect(() => {
+    Object.keys(polylineRefs.current).forEach(key => {
+      const idx = parseInt(key, 10);
+      const polyline = polylineRefs.current[idx];
+      if (polyline) {
+        // Apply smooth transition if not already applied
+        if (polyline._path && !polyline._path.style.transition) {
+          polyline._path.style.transition = 'opacity 150ms ease';
+        }
+
+        if (activeRouteId === null) {
+          polyline.setStyle({ opacity: 0.75, weight: 4 });
+        } else if (activeRouteId === idx) {
+          polyline.setStyle({ opacity: 1.0, weight: 5 });
+          polyline.bringToFront();
+        } else {
+          polyline.setStyle({ opacity: 0.08, weight: 3 });
+        }
+      }
+    });
+  }, [activeRouteId, routes]);
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}>
@@ -127,8 +154,21 @@ export default function MapComponent({ scheduleData, selectedVehicle }) {
               </Marker>
             );
           }
+          
+          const routeColor = ROUTE_COLORS[r.originalIndex % ROUTE_COLORS.length];
+          const isActive = activeRouteId === r.originalIndex;
+          const initialOpacity = activeRouteId === null ? 0.75 : (isActive ? 1.0 : 0.08);
+          const initialWeight = activeRouteId === null ? 4 : (isActive ? 5 : 3);
+
           return (
-            <Polyline key={idx} positions={r.coords} pathOptions={getPathOptions(r)}>
+            <Polyline 
+              key={r.originalIndex}
+              ref={(ref) => {
+                if (ref) polylineRefs.current[r.originalIndex] = ref;
+              }}
+              positions={r.coords} 
+              pathOptions={{ color: routeColor, weight: initialWeight, opacity: initialOpacity }}
+            >
               <Popup>
                 <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
                   <b style={{ textTransform: 'uppercase', fontSize: '11px', color: '#86868b' }}>{r.type}</b>

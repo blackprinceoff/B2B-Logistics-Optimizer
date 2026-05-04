@@ -91,6 +91,24 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -0.02em; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 
+/* Apple-style Skeleton & Micro-animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.skeleton {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background-color: rgba(0,0,0,0.06);
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stagger-item {
+  animation: slideInUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 /* Modal overlay */
 .modal-overlay {
   position: fixed;
@@ -111,6 +129,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -0.02em; }
   width: 480px;
   max-width: 95vw;
   box-shadow: 0 32px 80px rgba(0,0,0,0.18);
-  animation: slideUp 0.2s ease;
+  animation: slideUp 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+

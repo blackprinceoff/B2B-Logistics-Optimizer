@@ -25,15 +25,18 @@ function Navbar() {
   return (
     <nav style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '0 24px', height: '54px',
-      background: 'rgba(255,255,255,0.88)',
-      backdropFilter: 'blur(20px)',
+      padding: '0 24px', height: '56px', flexShrink: 0,
+      background: 'rgba(255,255,255,0.75)',
+      backdropFilter: 'saturate(180%) blur(20px)',
+      WebkitBackdropFilter: 'saturate(180%) blur(20px)',
       borderBottom: '1px solid rgba(0,0,0,0.08)',
       position: 'relative', zIndex: 1000,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '16px', letterSpacing: '-0.3px' }}>
-        <Truck size={22} color="#007aff" />
-        <span>B2B Logistics <span style={{ color: '#86868b', fontWeight: 400 }}>Pro</span></span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '16px', letterSpacing: '-0.4px', color: '#1d1d1f' }}>
+        <div style={{ background: '#007aff', padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Truck size={16} color="#ffffff" strokeWidth={2.5} />
+        </div>
+        <span>B2B Logistics <span style={{ color: '#86868b', fontWeight: 500 }}>Pro</span></span>
       </div>
       <div style={{ display: 'flex', gap: '4px' }}>
         <NavLink to="/" icon={Truck} label="Routing Map" />

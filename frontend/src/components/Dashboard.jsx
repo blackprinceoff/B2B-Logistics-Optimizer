@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [locationMap, setLocationMap]         = useState({});  // { id -> { lat, lng, name } }
   const [selectedVehicle, setSelectedVehicle] = useState('All');
   const [showMidDayModal, setShowMidDayModal] = useState(false);
+  const [activeRouteId, setActiveRouteId]     = useState(null);
 
   // Load locations from backend once — single source of truth
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Dashboard() {
       const data = await res.json();
       setScheduleData(data);
       setSelectedVehicle('All');
+      setActiveRouteId(null);
     } catch (err) {
       console.error('Full-day optimization failed:', err);
     } finally {
@@ -42,6 +44,7 @@ export default function Dashboard() {
   const handleMidDayResult = (data) => {
     setScheduleData(data);
     setSelectedVehicle('All');
+    setActiveRouteId(null);
   };
 
   return (
@@ -54,10 +57,16 @@ export default function Dashboard() {
         onOpenMidDay={() => setShowMidDayModal(true)}
         selectedVehicle={selectedVehicle}
         setSelectedVehicle={setSelectedVehicle}
+        activeRouteId={activeRouteId}
+        setActiveRouteId={setActiveRouteId}
       />
       <div style={{ flexGrow: 1, position: 'relative' }}>
         {/* MapComponent fetches its own locationMap from the same /api/locations */}
-        <MapComponent scheduleData={scheduleData} selectedVehicle={selectedVehicle} />
+        <MapComponent 
+          scheduleData={scheduleData} 
+          selectedVehicle={selectedVehicle}
+          activeRouteId={activeRouteId} 
+        />
       </div>
 
       {showMidDayModal && (
