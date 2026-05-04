@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -13,7 +13,7 @@ L.Icon.Default.mergeOptions({
 
 const dotIcon = new L.DivIcon({
   className: 'custom-dot-icon',
-  html: '<div style="width:12px;height:12px;background:#fff;border:3px solid #1d1d1f;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>',
+  html: '<div style="width:12px;height:12px;background:var(--bg-secondary, #fff);border:3px solid var(--text-primary, #1d1d1f);border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>',
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 });
@@ -40,26 +40,40 @@ async function fetchRoadGeometry(startLoc, endLoc, fallbackCoords) {
   return fallbackCoords;
 }
 
-export default function MapComponent({ scheduleData, selectedVehicle, activeRouteId }) {
-  // locationMap: { id -> { lat, lng, name } } — loaded from backend API, NOT hardcoded
-  const [locationMap, setLocationMap] = useState({});
-  const [routes, setRoutes] = useState([]);
-  
-  const polylineRefs = useRef({});
+/* ── Map Legend overlay ── */
+function MapLegend({ segments }) {
+  // Collect unique vehicles (not COMMUTE) with their colors
+  const vehicles = useMemo(() => {
+    if (!segments?.length) return [];
+    const seen = new Map();
+    segments.forEach((seg, idx) => {
+      if (seg.vehicleId === 'COMMUTE') return;
+      if (!seen.has(seg.vehicleId)) {
+        seen.set(seg.vehicleId, ROUTE_COLORS[idx % ROUTE_COLORS.length]);
+      }
+    });
+    return Array.from(seen.entries()).map(([id, color]) => ({ id, color }));
+  }, [segments]);
 
-  // Load locations from backend once on mount
-  useEffect(() => {
-    fetch('/api/locations')
-      .then(r => r.json())
-      .then(list => {
-        const map = {};
-        list.forEach(loc => {
-          map[loc.id] = { lat: loc.latitude, lng: loc.longitude, name: loc.name };
-        });
-        setLocationMap(map);
-      })
-      .catch(err => console.error('Failed to load locations from API:', err));
-  }, []);
+  if (vehicles.length === 0) return null;
+
+  return (
+    <div className="map-legend">
+      <div className="map-legend-title">Route Legend</div>
+      {vehicles.map(v => (
+        <div key={v.id} className="map-legend-item">
+          <div className="map-legend-dot" style={{ background: v.color }} />
+          {v.id}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function MapComponent({ scheduleData, selectedVehicle, activeRouteId, locationMap }) {
+  // locationMap now comes from props (Dashboard), no duplicate API call
+  const [routes, setRoutes] = useState([]);
+  const polylineRefs = useRef({});
 
   // Draw routes whenever schedule or filter changes
   useEffect(() => {
@@ -136,7 +150,7 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
           url='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
         />
 
-        {/* Location markers — sourced from backend */}
+        {/* Location markers — sourced from backend via props */}
         {Object.values(locationMap).map((loc, idx) => (
           <Marker key={idx} position={[loc.lat, loc.lng]} icon={dotIcon}>
             <Popup>
@@ -150,7 +164,7 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
           if (r._isBreakdown) {
             return (
               <Marker key={idx} position={r._pos}>
-                <Popup><b style={{ color: '#ff3b30' }}>BREAKDOWN!</b><br />{r.vehicleId}</Popup>
+                <Popup><b style={{ color: 'var(--danger)' }}>BREAKDOWN!</b><br />{r.vehicleId}</Popup>
               </Marker>
             );
           }
@@ -171,9 +185,9 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
             >
               <Popup>
                 <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
-                  <b style={{ textTransform: 'uppercase', fontSize: '11px', color: '#86868b' }}>{r.type}</b>
+                  <b style={{ textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>{r.type}</b>
                   <div style={{ fontWeight: 600 }}>{r.vehicleId}</div>
-                  <div style={{ color: r.profitOrCost >= 0 ? '#34c759' : '#ff3b30' }}>
+                  <div style={{ color: r.profitOrCost >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                     {r.profitOrCost > 0 ? '+' : ''}{r.profitOrCost?.toFixed(2)} ₴
                   </div>
                 </div>
@@ -182,6 +196,9 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
           );
         })}
       </MapContainer>
+
+      {/* Legend overlay */}
+      <MapLegend segments={scheduleData?.schedule} />
     </div>
   );
 }

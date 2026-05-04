@@ -1,16 +1,53 @@
-import React from 'react';
-import { Play, RefreshCcw, Activity, MapPin, CalendarClock, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Play, RefreshCcw, Activity, MapPin, CalendarClock, X, Route } from 'lucide-react';
 
 const ROUTE_COLORS = [
   '#2563EB', '#16A34A', '#DC2626', '#D97706', 
   '#7C3AED', '#0891B2', '#DB2777', '#65A30D'
 ];
 
+/* ── Animated Number Counter ── */
+function AnimatedNumber({ value, prefix = '', suffix = '', color, decimals = 0 }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(null);
+  const prevValue = useRef(0);
+
+  useEffect(() => {
+    const start = prevValue.current;
+    const end = value;
+    const duration = 600;
+    const startTime = performance.now();
+
+    const animate = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = start + (end - start) * eased;
+      setDisplay(current);
+      if (progress < 1) {
+        ref.current = requestAnimationFrame(animate);
+      } else {
+        prevValue.current = end;
+      }
+    };
+
+    ref.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(ref.current);
+  }, [value]);
+
+  return (
+    <span style={{ color }} className={value !== 0 ? 'count-pop' : ''}>
+      {prefix}{decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString('uk-UA')}{suffix}
+    </span>
+  );
+}
+
 function SkeletonCard({ index }) {
   return (
     <div className="stagger-item" style={{
-      background: '#fff', borderRadius: '12px', padding: '13px 14px 13px 16px',
-      border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: '12px',
+      background: 'var(--bg-secondary)', borderRadius: '12px', padding: '13px 14px 13px 16px',
+      border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '12px',
       animationDelay: `${index * 0.08}s`, flexShrink: 0
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -21,7 +58,7 @@ function SkeletonCard({ index }) {
         <div className="skeleton" style={{ width: '13px', height: '13px', borderRadius: '50%', marginTop: '2px' }} />
         <div className="skeleton" style={{ width: '100%', maxWidth: '220px', height: '16px', borderRadius: '4px' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', borderTop: '1px solid var(--glass-border)', paddingTop: '10px' }}>
         <div className="skeleton" style={{ width: '110px', height: '12px', borderRadius: '4px' }} />
         <div className="skeleton" style={{ width: '50px', height: '14px', borderRadius: '4px' }} />
       </div>
@@ -50,7 +87,7 @@ function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, o
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
 
-  const activeBg = isActive ? hexToRgba(routeColor, 0.1) : '#fff';
+  const activeBg = isActive ? hexToRgba(routeColor, 0.1) : 'var(--bg-secondary)';
   const leftBorderColor = routeColor;
 
   return (
@@ -59,7 +96,7 @@ function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, o
       onClick={onToggleActive}
       style={{
         background: activeBg, borderRadius: '12px',
-        border: '1px solid rgba(0,0,0,0.07)',
+        border: '1px solid var(--glass-border)',
         position: 'relative', overflow: 'hidden',
         flexShrink: 0,
         cursor: 'pointer',
@@ -82,9 +119,9 @@ function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, o
             onClick={(e) => { e.stopPropagation(); onClear(); }}
             style={{
               position: 'absolute', top: '10px', right: '10px',
-              background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%',
+              background: 'var(--border-color)', border: 'none', borderRadius: '50%',
               width: '24px', height: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center',
-              cursor: 'pointer', color: '#1d1d1f'
+              cursor: 'pointer', color: 'var(--text-primary)'
             }}
             title="Clear selection"
           >
@@ -98,20 +135,20 @@ function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, o
             display: 'inline-flex', alignItems: 'center',
             padding: '4px 10px', borderRadius: '999px',
             fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-            background: `rgba(0,0,0,0.05)`, color: '#1d1d1f',
+            background: 'var(--border-color)', color: 'var(--text-primary)',
           }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: routeColor, marginRight: '6px' }} />
             {displayType}
           </span>
-          <span style={{ fontSize: '11px', color: '#86868b', fontWeight: 600 }}>{vehicleLabel}</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>{vehicleLabel}</span>
         </div>
 
         {/* Row 2: Pin icon (with margin-right) + Route text */}
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '10px' }}>
-          <MapPin size={13} color="#8e8e93" style={{ marginTop: '2px', flexShrink: 0, marginRight: '8px' }} />
-          <div style={{ fontSize: '13px', fontWeight: 500, color: '#1d1d1f', lineHeight: 1.5 }}>
+          <MapPin size={13} color="var(--neutral)" style={{ marginTop: '2px', flexShrink: 0, marginRight: '8px' }} />
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.5 }}>
             {locStart}
-            <span style={{ color: '#8e8e93', margin: '0 5px', fontWeight: 400 }}>→</span>
+            <span style={{ color: 'var(--text-secondary)', margin: '0 5px', fontWeight: 400 }}>→</span>
             {locEnd}
           </div>
         </div>
@@ -119,14 +156,14 @@ function SegmentCard({ seg, locationMap, routeColor, isActive, onToggleActive, o
         {/* Row 3: Time+km (left) ↔ Profit (right) — space-between + center */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '9px',
+          borderTop: '1px solid var(--glass-border)', paddingTop: '9px',
         }}>
-          <span style={{ fontSize: '12px', color: '#86868b' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             {timeStart}–{timeEnd} · {(seg.distanceKm ?? 0).toFixed(1)} km
           </span>
           <span style={{
             fontSize: '13px', fontWeight: 600,
-            color: seg.profitOrCost > 0 ? '#34c759' : seg.profitOrCost < 0 ? '#ff3b30' : '#8e8e93',
+            color: seg.profitOrCost > 0 ? 'var(--success)' : seg.profitOrCost < 0 ? 'var(--danger)' : 'var(--neutral)',
           }}>
             {seg.profitOrCost > 0 ? '+' : ''}{(seg.profitOrCost ?? 0).toFixed(2)} ₴
           </span>
@@ -157,18 +194,19 @@ export default function Sidebar({
     : segmentsWithIndex.filter(s => s.vehicleId === selectedVehicle || s.vehicleId === 'COMMUTE');
 
   return (
-    <div style={{
-      width: '380px', flexShrink: 0, height: '100%',
-      background: 'rgba(255, 255, 255, 0.75)',
+    <div className="dashboard-sidebar" style={{
+      width: 'var(--sidebar-width)', flexShrink: 0, height: '100%',
+      background: 'var(--glass-bg)',
       backdropFilter: 'saturate(180%) blur(20px)',
       WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-      borderRight: '1px solid rgba(0,0,0,0.08)',
+      borderRight: '1px solid var(--border-color)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      transition: 'background 0.3s ease',
     }}>
 
       {/* ── Header ── */}
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', letterSpacing: '-0.4px', color: '#1d1d1f' }}>
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--glass-border)' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', letterSpacing: '-0.4px', color: 'var(--text-primary)' }}>
           Dispatch Control
         </h2>
 
@@ -193,42 +231,46 @@ export default function Sidebar({
             style={{
               flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
               height: '36px', borderRadius: '999px',
-              background: 'rgba(0,0,0,0.05)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: '13px', fontWeight: 600, color: '#1d1d1f', transition: 'background 0.15s',
+              background: 'var(--border-color)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', transition: 'background 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--glass-border)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--border-color)'}
           >
-            <CalendarClock size={14} color="#007aff" />
+            <CalendarClock size={14} color="var(--accent-blue)" />
             Mid-Day Sync
           </button>
         </div>
 
         {/* Stats card */}
         <div style={{
-          background: '#ffffff', borderRadius: '14px', padding: '16px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.04)',
+          background: 'var(--bg-secondary)', borderRadius: '14px', padding: '16px',
+          boxShadow: 'var(--card-shadow)', border: '1px solid var(--glass-border)',
+          transition: 'background 0.3s ease',
         }}>
-          <div style={{ fontSize: '10px', color: '#86868b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
             Financial Summary
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: '#86868b' }}>Net Profit</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Net Profit</span>
             <span style={{
               fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px',
-              color: profit > 0 ? '#34c759' : profit < 0 ? '#ff3b30' : '#1d1d1f',
             }}>
-              {profit.toFixed(0)} ₴
+              <AnimatedNumber 
+                value={profit} 
+                suffix=" ₴" 
+                color={profit > 0 ? 'var(--success)' : profit < 0 ? 'var(--danger)' : 'var(--text-primary)'}
+              />
             </span>
           </div>
-          <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#86868b' }}>
+          <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
               <span>Orders completed</span>
-              <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{data?.completedOrders ?? 0}</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{data?.completedOrders ?? 0}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#86868b' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
               <span>Total distance</span>
-              <span style={{ fontWeight: 600, color: '#1d1d1f' }}>{(data?.totalDistanceKm ?? 0).toFixed(1)} km</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{(data?.totalDistanceKm ?? 0).toFixed(1)} km</span>
             </div>
           </div>
         </div>
@@ -237,7 +279,7 @@ export default function Sidebar({
       {/* ── Timeline ── */}
       <div style={{ flexGrow: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '28px', marginBottom: '4px', flexShrink: 0 }}>
-          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: '#86868b', lineHeight: '28px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-secondary)', lineHeight: '28px' }}>
             Timeline
           </span>
           {segments.length > 0 && (
@@ -246,9 +288,9 @@ export default function Sidebar({
               onChange={e => setSelectedVehicle(e.target.value)}
               style={{
                 height: '26px', padding: '0 8px', borderRadius: '7px',
-                border: '1px solid rgba(0,0,0,0.12)',
-                background: '#fff', fontSize: '11px', fontFamily: 'inherit',
-                outline: 'none', cursor: 'pointer', color: '#1d1d1f',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)', fontSize: '11px', fontFamily: 'inherit',
+                outline: 'none', cursor: 'pointer', color: 'var(--text-primary)',
                 display: 'flex', alignItems: 'center',
               }}
             >
@@ -258,10 +300,12 @@ export default function Sidebar({
         </div>
 
         {segments.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', color: '#86868b', marginTop: '40px' }}>
-            <Activity size={28} style={{ opacity: 0.18, display: 'block', margin: '0 auto 10px' }} />
-            <p style={{ fontSize: '13px', fontWeight: 500 }}>No routes generated yet.</p>
-            <p style={{ fontSize: '12px', marginTop: '3px', opacity: 0.7 }}>Click "Run Full Day" to start.</p>
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '40px' }}>
+            <div className="empty-state-icon">
+              <Route size={24} />
+            </div>
+            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>No routes generated yet</p>
+            <p style={{ fontSize: '12px', opacity: 0.7 }}>Click "Run Full Day" to optimize your fleet</p>
           </div>
         )}
 

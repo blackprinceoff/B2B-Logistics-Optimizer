@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Clock, Truck, AlertTriangle, RefreshCcw, Play } from 'lucide-react';
+import { useToast } from './Toast';
 
 const TIME_OPTIONS = [
   { label: '10:00 — Morning check', value: '2025-06-20T10:00:00' },
@@ -14,6 +15,7 @@ export default function MidDayModal({ onClose, onResult }) {
   const [breakdownVehicle, setBreakdownVehicle] = useState('none');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('pick'); // 'pick' | 'review' | 'done'
+  const addToast = useToast();
 
   const handleFetchSnapshot = async () => {
     setLoading(true);
@@ -23,8 +25,9 @@ export default function MidDayModal({ onClose, onResult }) {
       const data = await res.json();
       setSnapshot(data);
       setStep('review');
+      addToast('Fleet snapshot loaded successfully', 'success');
     } catch (err) {
-      alert('Failed to fetch snapshot: ' + err.message);
+      addToast('Failed to fetch snapshot: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -55,7 +58,7 @@ export default function MidDayModal({ onClose, onResult }) {
       onResult(result);
       onClose();
     } catch (err) {
-      alert('Error: ' + err.message);
+      addToast('Re-optimization error: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +94,7 @@ export default function MidDayModal({ onClose, onResult }) {
                   display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px',
                   borderRadius: '12px', cursor: 'pointer',
                   border: `2px solid ${selectedTime === opt.value ? 'var(--accent-blue)' : 'var(--border-color)'}`,
-                  background: selectedTime === opt.value ? 'rgba(0,122,255,0.05)' : 'var(--bg-primary)',
+                  background: selectedTime === opt.value ? 'var(--accent-blue-soft)' : 'var(--bg-primary)',
                   transition: 'all 0.15s',
                 }}>
                   <input type="radio" name="time" value={opt.value} checked={selectedTime === opt.value}
@@ -132,8 +135,9 @@ export default function MidDayModal({ onClose, onResult }) {
               style={{
                 width: '100%', padding: '12px 14px', borderRadius: '10px', marginBottom: '24px',
                 border: `1px solid ${breakdownVehicle !== 'none' ? 'var(--danger)' : 'var(--border-color)'}`,
-                background: breakdownVehicle !== 'none' ? 'rgba(255,59,48,0.05)' : 'var(--bg-primary)',
+                background: breakdownVehicle !== 'none' ? 'var(--danger-soft)' : 'var(--bg-primary)',
                 fontSize: '14px', outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                color: 'var(--text-primary)',
               }}>
               <option value="none">No breakdown — everything is fine</option>
               {uniqueVehicles.map(v => <option key={v} value={v}>🚨 {v} — engine failure</option>)}
@@ -143,6 +147,7 @@ export default function MidDayModal({ onClose, onResult }) {
               <button onClick={() => setStep('pick')} style={{
                 flex: '0 0 auto', padding: '12px 20px', borderRadius: '980px', border: '1px solid var(--border-color)',
                 background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px',
+                color: 'var(--text-primary)',
               }}>← Back</button>
               <button className="btn-primary" onClick={handleReoptimize} disabled={loading}
                 style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>

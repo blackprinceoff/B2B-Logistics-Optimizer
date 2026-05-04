@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import MapComponent from './MapComponent';
 import Sidebar from './Sidebar';
 import MidDayModal from './MidDayModal';
+import { useToast } from './Toast';
 
 export default function Dashboard() {
   const [scheduleData, setScheduleData]       = useState(null);
   const [loading, setLoading]                 = useState(false);
-  const [locationMap, setLocationMap]         = useState({});  // { id -> { lat, lng, name } }
+  const [locationMap, setLocationMap]         = useState({});
   const [selectedVehicle, setSelectedVehicle] = useState('All');
   const [showMidDayModal, setShowMidDayModal] = useState(false);
   const [activeRouteId, setActiveRouteId]     = useState(null);
+  const addToast = useToast();
 
   // Load locations from backend once — single source of truth
   useEffect(() => {
@@ -22,7 +24,10 @@ export default function Dashboard() {
         });
         setLocationMap(map);
       })
-      .catch(err => console.error('Failed to load locations:', err));
+      .catch(err => {
+        console.error('Failed to load locations:', err);
+        addToast('Failed to load locations from server', 'error');
+      });
   }, []);
 
   const handleRunOptimization = async () => {
@@ -34,8 +39,10 @@ export default function Dashboard() {
       setScheduleData(data);
       setSelectedVehicle('All');
       setActiveRouteId(null);
+      addToast(`Optimization complete — ${data.completedOrders} orders, ${data.totalProfit.toFixed(0)} ₴ profit`, 'success');
     } catch (err) {
       console.error('Full-day optimization failed:', err);
+      addToast('Optimization failed: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -45,10 +52,11 @@ export default function Dashboard() {
     setScheduleData(data);
     setSelectedVehicle('All');
     setActiveRouteId(null);
+    addToast(`Re-optimization complete — ${data.completedOrders} orders rescheduled`, 'success');
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="dashboard-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       <Sidebar
         data={scheduleData}
         loading={loading}
@@ -60,12 +68,13 @@ export default function Dashboard() {
         activeRouteId={activeRouteId}
         setActiveRouteId={setActiveRouteId}
       />
-      <div style={{ flexGrow: 1, position: 'relative' }}>
-        {/* MapComponent fetches its own locationMap from the same /api/locations */}
+      <div className="dashboard-map" style={{ flexGrow: 1, position: 'relative' }}>
+        {/* locationMap passed as prop — no duplicate API call */}
         <MapComponent 
           scheduleData={scheduleData} 
           selectedVehicle={selectedVehicle}
-          activeRouteId={activeRouteId} 
+          activeRouteId={activeRouteId}
+          locationMap={locationMap}
         />
       </div>
 
