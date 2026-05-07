@@ -21,24 +21,26 @@ export default function RegressionChart({ orderPoints, transferPoints, reg, regr
         </div>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <ScatterChart>
+        <ScatterChart margin={{ top: 10, right: 140, bottom: 10, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
           <XAxis type="number" dataKey="x" name="Distance" unit=" km" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} label={{ value: 'Distance (km)', position: 'insideBottom', offset: -2, fontSize: 11, fill: 'var(--text-secondary)' }} />
           <YAxis type="number" dataKey="y" name="Profit" unit=" ₴" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70} />
           <Tooltip content={({ active, payload }) => {
             if (!active || !payload?.length) return null;
             const d = payload[0]?.payload;
+            if (!d) return null;
+            const type = d.vehicle ? 'ORDER' : 'TRANSFER';
             return (
               <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', border: '1px solid var(--border-color)', fontSize: '12px' }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d?.vehicle}</div>
-                <div style={{ color: 'var(--text-secondary)' }}>{d?.x} km</div>
-                <div style={{ fontWeight: 700, color: d?.y >= 0 ? 'var(--success)' : 'var(--danger)' }}>{d?.y >= 0 ? '+' : ''}{d?.y} ₴</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{type}</div>
+                <div style={{ color: 'var(--text-secondary)' }}>Distance: {d.x} km</div>
+                <div style={{ fontWeight: 700, color: d.y >= 0 ? 'var(--success)' : 'var(--danger)' }}>Revenue: {d.y >= 0 ? '+' : ''}{d.y} ₴</div>
               </div>
             );
           }} />
-          <Legend wrapperStyle={{ fontSize: '12px' }} />
-          <Scatter name="Order" data={orderPoints} fill={COLORS.success} opacity={0.75} />
-          <Scatter name="Transfer" data={transferPoints} fill={COLORS.accent} opacity={0.4} />
+          <Legend layout="vertical" align="right" verticalAlign="top" wrapperStyle={{ fontSize: '12px', paddingLeft: '12px' }} />
+          <Scatter name="Order" data={orderPoints} fill={COLORS.success} opacity={0.75} r={5} />
+          <Scatter name="Transfer" data={transferPoints} fill={COLORS.accent} opacity={0.4} r={5} />
           <Scatter name="OLS Regression Line" data={regressionLine} fill="none" line={{ stroke: COLORS.warning, strokeWidth: 2, strokeDasharray: '6 3' }} shape={() => null} />
         </ScatterChart>
       </ResponsiveContainer>

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Truck, BarChart3, Moon, Sun } from 'lucide-react';
+import { Truck, BarChart3, Moon, Sun, Route as RouteIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import AnalyticsView from './components/AnalyticsView';
@@ -12,11 +12,15 @@ function NavLink({ to, icon: Icon, label }) {
   return (
     <Link to={to} style={{
       display: 'flex', alignItems: 'center', gap: '6px',
-      padding: '7px 14px', borderRadius: '999px', textDecoration: 'none',
+      padding: '7px 14px', borderRadius: '8px', textDecoration: 'none',
       color: active ? 'var(--accent-blue)' : 'var(--text-secondary)',
       background: active ? 'var(--accent-blue-soft)' : 'transparent',
-      fontWeight: 500, fontSize: '13px', transition: 'all 0.15s',
-    }}>
+      fontWeight: 500, fontSize: '13px',
+      transition: 'all 200ms cubic-bezier(0.25, 0.1, 0.25, 1)',
+    }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+    >
       <Icon size={15} />
       {label}
     </Link>
@@ -29,13 +33,14 @@ function Navbar({ isDark, onToggleTheme }) {
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '0 24px', height: 'var(--navbar-height)', flexShrink: 0,
       background: 'var(--glass-bg)',
-      backdropFilter: 'saturate(180%) blur(20px)',
-      WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+      backdropFilter: 'saturate(180%) blur(12px)',
+      WebkitBackdropFilter: 'saturate(180%) blur(12px)',
       borderBottom: '1px solid var(--border-color)',
-      position: 'relative', zIndex: 1000,
+      position: 'sticky', top: 0, zIndex: 1000,
       transition: 'background 0.3s ease',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '16px', letterSpacing: '-0.4px', color: 'var(--text-primary)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontWeight: 600, fontSize: '16px', letterSpacing: '-0.3px', color: 'var(--text-primary)', cursor: 'pointer', transition: 'opacity 200ms ease' }} onMouseEnter={e => e.currentTarget.style.opacity = '0.7'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+        <RouteIcon size={18} color="var(--accent-blue)" />
         LogiOpt
       </div>
       <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>

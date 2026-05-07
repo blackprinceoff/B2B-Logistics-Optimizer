@@ -194,7 +194,7 @@ export default function Sidebar({
               height: '36px', padding: '0', fontSize: '13px', fontWeight: 600,
             }}
           >
-            {loading ? <RefreshCcw size={14} className="spin" /> : <Play size={14} />}
+            {loading ? <RefreshCcw size={15} className="spin" /> : <Play size={15} />}
             Run Full Day
           </button>
 
@@ -205,12 +205,15 @@ export default function Sidebar({
               flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
               height: '36px', borderRadius: '999px',
               background: 'var(--border-color)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', transition: 'background 0.15s',
+              fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)',
+              transition: 'all 200ms cubic-bezier(0.25, 0.1, 0.25, 1)',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--glass-border)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--border-color)'}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-border)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--border-color)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
           >
-            <CalendarClock size={14} color="var(--accent-blue)" />
+            <CalendarClock size={15} color="var(--accent-blue)" />
             Mid-Day Sync
           </button>
         </div>

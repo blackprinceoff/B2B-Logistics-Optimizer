@@ -24,11 +24,11 @@ export default function MonteCarloChart({ mcHistogram, expectedValue, stdDev, mi
           </div>
         ))}
       </div>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={mcHistogram} barCategoryGap="4%">
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={v => v.toLocaleString('uk-UA')} />
-          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={34} />
+          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: COLORS.neutral }} tickFormatter={v => v.toLocaleString('uk-UA')} label={{ value: 'Profit (₴)', position: 'insideBottom', offset: -4, fontSize: 11, fill: COLORS.neutral }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: COLORS.neutral }} width={44} label={{ value: 'Simulation runs', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: COLORS.neutral, style: { textAnchor: 'middle' } }} />
           <Tooltip content={({ active, payload }) => {
             if (!active || !payload?.length) return null;
             const d = payload[0]?.payload;
@@ -42,10 +42,12 @@ export default function MonteCarloChart({ mcHistogram, expectedValue, stdDev, mi
           <ReferenceLine x={Math.round(expectedValue)} stroke={COLORS.success} strokeDasharray="5 4" strokeWidth={2} label={{ value: 'μ', fill: COLORS.success, fontSize: 12 }} />
           <ReferenceLine x={Math.round(expectedValue - stdDev)} stroke={COLORS.accent} strokeDasharray="3 3" strokeWidth={1} />
           <ReferenceLine x={Math.round(expectedValue + stdDev)} stroke={COLORS.accent} strokeDasharray="3 3" strokeWidth={1} label={{ value: '±σ', fill: COLORS.accent, fontSize: 10 }} />
-          <Bar dataKey="count" name="Frequency" radius={[4, 4, 0, 0]}>
-            {mcHistogram.map((entry, i) => (
-              <Cell key={i} fill={entry.rangeStart <= expectedValue + stdDev && entry.rangeEnd >= expectedValue - stdDev ? COLORS.accent : 'var(--border-color)'} opacity={entry.rangeStart <= expectedValue + stdDev && entry.rangeEnd >= expectedValue - stdDev ? 0.75 : 0.4} />
-            ))}
+          <Bar dataKey="count" name="Frequency" radius={[4, 4, 0, 0]} strokeWidth={1}>
+            {mcHistogram.map((entry, i) => {
+              const inRange = entry.rangeStart <= expectedValue + stdDev && entry.rangeEnd >= expectedValue - stdDev;
+              const color = inRange ? COLORS.accent : 'var(--border-color)';
+              return <Cell key={i} fill={color} stroke={color} opacity={inRange ? 0.85 : 0.4} />;
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
