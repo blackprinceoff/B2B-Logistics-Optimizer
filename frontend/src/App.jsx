@@ -36,10 +36,7 @@ function Navbar({ isDark, onToggleTheme }) {
       transition: 'background 0.3s ease',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '16px', letterSpacing: '-0.4px', color: 'var(--text-primary)' }}>
-        <div style={{ background: 'var(--accent-blue)', padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Truck size={16} color="#ffffff" strokeWidth={2.5} />
-        </div>
-        <span>B2B Logistics <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Pro</span></span>
+        LogiOpt
       </div>
       <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
         <NavLink to="/" icon={Truck} label="Routing Map" />
