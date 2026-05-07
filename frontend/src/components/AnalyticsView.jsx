@@ -1,199 +1,194 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, ReferenceLine, Area, AreaChart,
-  PieChart, Pie, Cell, ScatterChart, Scatter, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, ScatterChart, Scatter, Legend,
 } from 'recharts';
-import { Activity, Zap, TrendingUp, AlertTriangle, RefreshCcw, Truck, Fuel, Clock, Target } from 'lucide-react';
+import { Activity, Zap, TrendingUp, AlertTriangle, RefreshCcw, Truck, Fuel, Target } from 'lucide-react';
+import { AnimatedNumber } from './Sidebar';
+import { buildVehicleColorMap } from '../utils/vehicleColors';
 
-/* ── Animated Counter (reusable) ── */
-function AnimatedValue({ value, decimals = 0 }) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef(null);
-  const prev = useRef(0);
-
-  useEffect(() => {
-    const start = prev.current;
-    const end = value;
-    const dur = 700;
-    const t0 = performance.now();
-    const tick = (now) => {
-      const p = Math.min((now - t0) / dur, 1);
-      const e = 1 - Math.pow(1 - p, 3);
-      setDisplay(start + (end - start) * e);
-      if (p < 1) ref.current = requestAnimationFrame(tick);
-      else prev.current = end;
-    };
-    ref.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(ref.current);
-  }, [value]);
-
-  return decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString('uk-UA');
+/* ── Ordinary Least Squares linear regression ── */
+function linearRegression(points) {
+  const n = points.length;
+  if (n < 2) return { a: 0, b: 0, r2: 0 };
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return { a: sumY / n, b: 0, r2: 0 };
+  const b = (n * sumXY - sumX * sumY) / denom;
+  const a = (sumY - b * sumX) / n;
+  const meanY = sumY / n;
+  const ssTot = points.reduce((s, p) => s + (p.y - meanY) ** 2, 0);
+  const ssRes = points.reduce((s, p) => s + (p.y - (a + b * p.x)) ** 2, 0);
+  const r2 = ssTot === 0 ? 0 : 1 - ssRes / ssTot;
+  return { a, b, r2 };
 }
 
-/* ── Stat Card ── */
-function StatCard({ icon: Icon, label, value, color, subtitle }) {
+/* ── Build histogram bins from array of numbers ── */
+function buildHistogram(values, numBins = 12) {
+  if (!values.length) return [];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const width = (max - min) / numBins || 1;
+  const bins = Array.from({ length: numBins }, (_, i) => ({
+    label: Math.round(min + i * width),
+    count: 0,
+    rangeStart: min + i * width,
+    rangeEnd: min + (i + 1) * width,
+  }));
+  values.forEach(v => {
+    const idx = Math.min(Math.floor((v - min) / width), numBins - 1);
+    bins[idx].count++;
+  });
+  return bins;
+}
+
+/* AnimatedValue — wrapper to reuse Sidebar's component safely */
+function AnimatedValue({ value, decimals = 0 }) {
   return (
-    <div className="stagger-item" style={{
-      background: 'var(--bg-secondary)', borderRadius: '16px', padding: '20px',
-      border: '1px solid var(--border-color)', transition: 'all 0.2s',
+    <AnimatedNumber value={value} decimals={decimals} color={undefined} />
+  );
+}
+
+/* ── Stat Card Component ── */
+function StatCard({ icon: Icon, label, value, color }) {
+  return (
+    <div style={{
+      background: 'var(--bg-secondary)', padding: '20px', borderRadius: '16px',
+      border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '16px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
-        <Icon size={16} />
-        <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+      <div style={{
+        background: color ? `${color}15` : 'var(--bg-hover)', color: color || 'var(--text-primary)',
+        width: 48, height: 48, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={24} />
       </div>
-      <div style={{ fontSize: '30px', fontWeight: 700, letterSpacing: '-1px', color: color ?? 'var(--text-primary)' }}>{value}</div>
-      {subtitle && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{subtitle}</div>}
+      <div>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '4px' }}>{label}</div>
+        <div style={{ fontSize: '24px', fontWeight: 700, color: color || 'var(--text-primary)' }}>{value}</div>
+      </div>
     </div>
   );
 }
 
-/* ── Section wrapper ── */
-function Section({ title, subtitle, children, style }) {
+/* ── Section Wrapper Component ── */
+function Section({ title, subtitle, children }) {
   return (
-    <div className="stagger-item" style={{
-      background: 'var(--bg-secondary)', borderRadius: '16px', padding: '24px',
-      border: '1px solid var(--border-color)', marginBottom: '20px', ...style,
+    <div style={{
+      background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+      borderRadius: '16px', padding: '24px', marginBottom: '24px',
     }}>
-      {title && <h3 style={{ fontSize: '15px', marginBottom: '4px', color: 'var(--text-primary)' }}>{title}</h3>}
-      {subtitle && <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{subtitle}</p>}
+      <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{title}</h3>
+      {subtitle && <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>{subtitle}</p>}
       {children}
     </div>
   );
 }
 
-/* ── Custom Recharts Tooltip ── */
-const CustomTooltip = ({ active, payload, label, suffix = ' ₴' }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: 'var(--bg-secondary)', borderRadius: '12px', padding: '12px 16px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border-color)',
-      fontSize: '13px', color: 'var(--text-primary)',
-    }}>
-      <div style={{ fontWeight: 600, marginBottom: '4px' }}>{label}</div>
-      {payload.map((p, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || p.fill }} />
-          <span style={{ color: 'var(--text-secondary)' }}>{p.name}:</span>
-          <span style={{ fontWeight: 600 }}>{typeof p.value === 'number' ? p.value.toLocaleString('uk-UA') : p.value}{suffix}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
+/* ── Tooltip Component for Charts ── */
+function CustomTooltip({ active, payload, label, suffix = '' }) {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+        borderRadius: '12px', padding: '12px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+      }}>
+        <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</p>
+        {payload.map((p, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', marginBottom: '4px' }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color || p.fill }} />
+            <span style={{ color: 'var(--text-secondary)', flex: 1 }}>{p.name}:</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+              {typeof p.value === 'number' ? p.value.toLocaleString('uk-UA') : p.value}{suffix}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
 
-/* ── Color palette for charts ── */
-const VEHICLE_COLORS = ['#2563EB', '#16A34A', '#DC2626', '#D97706', '#7C3AED', '#0891B2', '#DB2777', '#65A30D'];
-const COST_COLORS = ['#34c759', '#ff3b30', '#007aff', '#ff9f0a', '#8e8e93'];
-
-export default function AnalyticsView() {
-  const [mcData, setMcData] = useState(null);
-  const [scheduleData, setScheduleData] = useState(null);
+/* ═════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═════════════════════════════════════════════════════════════ */
+export default function AnalyticsView({ sharedSchedule }) {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchData = async () => {
     try {
-      // Fetch both analytics and schedule in parallel
-      const [mcRes, schedRes] = await Promise.all([
-        fetch('/api/analysis/monte-carlo'),
-        fetch('/api/optimize'),
-      ]);
-      if (!mcRes.ok) throw new Error('Analytics: HTTP ' + mcRes.status);
-      if (!schedRes.ok) throw new Error('Schedule: HTTP ' + schedRes.status);
-      
-      const [mc, sched] = await Promise.all([mcRes.json(), schedRes.json()]);
-      setMcData(mc);
-      setScheduleData(sched);
-    } catch (err) {
-      setError(err.message);
+      setLoading(true);
+      setError(null);
+      const analysisRes = await fetch('http://localhost:8080/api/analysis/monte-carlo').then(r => r.json());
+
+      let scheduleRes = sharedSchedule;
+      if (!scheduleRes) {
+        scheduleRes = await fetch('http://localhost:8080/api/optimize').then(r => r.json());
+      }
+
+      setData({ mcData: analysisRes, scheduleData: scheduleRes });
+    } catch (e) {
+      console.error('Failed to load analytics:', e);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: '12px', color: 'var(--text-secondary)' }}>
-        <RefreshCcw size={28} className="spin" />
-        <span style={{ fontSize: '14px' }}>Running Monte Carlo Simulation & Schedule Analysis…</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: '16px' }}>
-        <AlertTriangle size={32} color="var(--warning)" />
-        <p style={{ color: 'var(--text-secondary)' }}>Could not load analytics: {error}</p>
-        <button className="btn-primary" onClick={fetchData}>Retry</button>
-      </div>
-    );
-  }
-
-  // ══════════════════════════════════════════════
-  //  Monte Carlo data
-  // ══════════════════════════════════════════════
-  const { baselineProfit, smartProfit, optimalityGap, monteCarloStats, lookAheadSensitivity } = mcData;
-  const { expectedValue, stdDev, minProfit, maxProfit, distribution } = monteCarloStats;
-  const iterations = distribution.length;
-
-  // Chart data for MC distribution
-  const chartData = distribution.map((profit, i) => ({ iteration: i + 1, profit: Math.round(profit) }));
-
-  // Confidence interval band data
-  const ciData = chartData.map(d => ({
-    ...d,
-    upper2: Math.round(expectedValue + 2 * stdDev),
-    upper1: Math.round(expectedValue + stdDev),
-    mean: Math.round(expectedValue),
-    lower1: Math.round(expectedValue - stdDev),
-    lower2: Math.round(expectedValue - 2 * stdDev),
-  }));
-
-  // Sensitivity chart from map
-  const sensitivityData = lookAheadSensitivity
-    ? Object.entries(lookAheadSensitivity).map(([k, v]) => ({ minutes: `${k}m`, profit: Math.round(v) }))
-    : [];
-
-  // ══════════════════════════════════════════════
-  //  Schedule-based analytics
-  // ══════════════════════════════════════════════
+  const mcData = data?.mcData || {};
+  const scheduleData = data?.scheduleData || {};
   const segments = scheduleData?.schedule ?? [];
 
-  // ── Fleet Utilization per vehicle ──
-  const fleetUtil = (() => {
+  // ══════════════════════════════════════════════
+  //  Monte Carlo & Sensitivity Data Preparation
+  // ══════════════════════════════════════════════
+  const { baselineProfit = 0, smartProfit: mcSmartProfit = 0, optimalityGap: mcOptimalityGap = 0, monteCarloStats = {}, lookAheadSensitivity = null } = mcData;
+  const { expectedValue = 0, stdDev = 0, minProfit = 0, maxProfit = 0, distribution = [] } = monteCarloStats;
+  const iterations = distribution.length;
+
+  // Use the exact profit from the generated schedule to perfectly sync with the Map
+  const smartProfit = scheduleData?.totalProfit ?? mcSmartProfit;
+  const optimalityGap = baselineProfit !== 0 ? ((smartProfit - baselineProfit) / Math.abs(baselineProfit)) * 100.0 : mcOptimalityGap;
+
+  const mcHistogram = useMemo(() => buildHistogram(distribution, 12), [distribution]);
+
+  const sensitivityData = useMemo(() => (
+    lookAheadSensitivity
+      ? Object.entries(lookAheadSensitivity).map(([k, v]) => ({ minutes: `${k}m`, profit: Math.round(v) }))
+      : []
+  ), [lookAheadSensitivity]);
+
+  // ══════════════════════════════════════════════
+  //  Schedule Data Preparation
+  // ══════════════════════════════════════════════
+  const vehicleColorMap = useMemo(() => buildVehicleColorMap(segments), [segments]);
+
+  const fleetUtil = useMemo(() => {
     const map = {};
     segments.forEach(seg => {
       const vid = seg.vehicleId === 'COMMUTE' ? (seg.driverId || 'Unknown') : seg.vehicleId;
       if (!map[vid]) map[vid] = { vehicle: vid, order: 0, transfer: 0, waiting: 0, breakdown: 0, commute: 0 };
-
       const start = new Date(seg.startTime);
       const end = new Date(seg.endTime);
       const mins = Math.max(0, (end - start) / 60000);
-
-      if (seg.vehicleId === 'COMMUTE' || (seg.type === 'TRANSFER' && seg.profitOrCost < -40)) {
-        map[vid].commute += mins;
-      } else if (seg.type === 'ORDER') {
-        map[vid].order += mins;
-      } else if (seg.type === 'TRANSFER') {
-        map[vid].transfer += mins;
-      } else if (seg.type === 'WAITING') {
-        map[vid].waiting += mins;
-      } else if (seg.type === 'BREAKDOWN') {
-        map[vid].breakdown += mins;
-      }
+      if (seg.vehicleId === 'COMMUTE' || (seg.type === 'TRANSFER' && seg.profitOrCost < -40)) map[vid].commute += mins;
+      else if (seg.type === 'ORDER') map[vid].order += mins;
+      else if (seg.type === 'TRANSFER') map[vid].transfer += mins;
+      else if (seg.type === 'WAITING') map[vid].waiting += mins;
+      else if (seg.type === 'BREAKDOWN') map[vid].breakdown += mins;
     });
     return Object.values(map).sort((a, b) => a.vehicle.localeCompare(b.vehicle));
-  })();
+  }, [segments]);
 
-  // ── Cost Breakdown (donut) ──
-  const costBreakdown = (() => {
+  const costBreakdown = useMemo(() => {
     let revenue = 0, transferCost = 0, commuteCost = 0, breakdownCost = 0, waitingCost = 0;
     segments.forEach(seg => {
       const p = seg.profitOrCost || 0;
@@ -210,10 +205,9 @@ export default function AnalyticsView() {
       { name: 'Breakdown Penalty', value: Math.round(breakdownCost), color: '#ff3b30' },
       { name: 'Waiting Cost', value: Math.round(waitingCost), color: '#8e8e93' },
     ].filter(d => d.value > 0);
-  })();
+  }, [segments]);
 
-  // ── Revenue per Vehicle ──
-  const revenuePerVehicle = (() => {
+  const revenuePerVehicle = useMemo(() => {
     const map = {};
     segments.forEach(seg => {
       if (seg.vehicleId === 'COMMUTE') return;
@@ -223,146 +217,242 @@ export default function AnalyticsView() {
     return Object.entries(map)
       .map(([vehicle, profit]) => ({ vehicle, profit: Math.round(profit) }))
       .sort((a, b) => b.profit - a.profit);
-  })();
+  }, [segments]);
 
-  // ── Distance vs Revenue (scatter) ──
-  const scatterData = segments
-    .filter(s => s.type === 'ORDER' || s.type === 'TRANSFER')
-    .map(s => ({
-      distance: +(s.distanceKm || 0).toFixed(1),
-      profit: +(s.profitOrCost || 0).toFixed(2),
-      type: s.type,
-      vehicle: s.vehicleId,
-    }));
-  const scatterOrders = scatterData.filter(d => d.type === 'ORDER');
-  const scatterTransfers = scatterData.filter(d => d.type === 'TRANSFER');
+  // Linear Regression Logic
+  const { orderPoints, transferPoints, reg, regressionLine } = useMemo(() => {
+    const orderPts = segments
+      .filter(s => s.type === 'ORDER')
+      .map(s => ({ x: +(s.distanceKm || 0).toFixed(1), y: +(s.profitOrCost || 0).toFixed(2), vehicle: s.vehicleId }));
 
-  // ── Quick stats for schedule ──
+    const transPts = segments
+      .filter(s => s.type === 'TRANSFER' && s.vehicleId !== 'COMMUTE')
+      .map(s => ({ x: +(s.distanceKm || 0).toFixed(1), y: +(s.profitOrCost || 0).toFixed(2) }));
+
+    const lr = linearRegression(orderPts);
+    const xVals = orderPts.map(p => p.x);
+    const xMin = Math.min(...xVals, 0);
+    const xMax = Math.max(...xVals, 1);
+    const lrLine = [
+      { x: +xMin.toFixed(1), y: +(lr.a + lr.b * xMin).toFixed(0) },
+      { x: +xMax.toFixed(1), y: +(lr.a + lr.b * xMax).toFixed(0) },
+    ];
+    return { orderPoints: orderPts, transferPoints: transPts, reg: lr, regressionLine: lrLine };
+  }, [segments]);
+
   const totalVehicles = new Set(segments.filter(s => s.vehicleId !== 'COMMUTE').map(s => s.vehicleId)).size;
-  const avgProfitPerOrder = segments.filter(s => s.type === 'ORDER').length > 0
-    ? segments.filter(s => s.type === 'ORDER').reduce((sum, s) => sum + s.profitOrCost, 0) / segments.filter(s => s.type === 'ORDER').length
-    : 0;
+  const orderSegs = segments.filter(s => s.type === 'ORDER');
+  const avgProfitPerOrder = orderSegs.length > 0 ? orderSegs.reduce((sum, s) => sum + s.profitOrCost, 0) / orderSegs.length : 0;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: '16px' }}>
+        <Activity size={32} color="var(--accent-blue)" className="spin" />
+        <p style={{ color: 'var(--text-secondary)' }}>Gathering mathematics & simulating realities...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: '16px' }}>
+        <AlertTriangle size={32} color="var(--warning)" />
+        <p style={{ color: 'var(--text-secondary)' }}>Could not load analytics: {error}</p>
+        <button className="btn-primary" onClick={fetchData}>Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '32px 40px', background: 'var(--bg-primary)', transition: 'background 0.3s' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '28px', marginBottom: '6px', color: 'var(--text-primary)' }}>Risk Analytics</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', fontSize: '14px' }}>
-          Monte Carlo Simulation · {iterations} iterations · Traffic &amp; breakdown variability
-        </p>
-
-        {/* ═══ KPI Grid ═══ */}
-        <div className="analytics-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '24px' }}>
-          <StatCard icon={TrendingUp} label="Baseline (no lookahead)"
-            value={<><AnimatedValue value={baselineProfit} /> ₴</>} />
-          <StatCard icon={Zap} label="Smart optimizer profit"
-            value={<><AnimatedValue value={smartProfit} /> ₴</>} color="var(--accent-blue)" />
-          <StatCard icon={Activity} label="Expected (risk-adjusted)"
-            value={<><AnimatedValue value={expectedValue} /> ₴</>} color="var(--success)" />
-          <StatCard icon={AlertTriangle} label="Std deviation (risk)"
-            value={<>±<AnimatedValue value={stdDev} /> ₴</>} color="var(--warning)" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', marginBottom: '6px', color: 'var(--text-primary)' }}>Analytics & Mathematics</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Stochastic robustness and algorithm performance metrics</p>
+          </div>
         </div>
 
-        {/* ═══ Optimality Gap ═══ */}
-        <Section style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Optimality Gap vs Baseline</div>
-            <div style={{ fontSize: '14px', marginTop: '4px', color: 'var(--text-primary)' }}>Smart algorithm outperforms greedy baseline by this margin</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: optimalityGap >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-              {optimalityGap >= 0 ? '+' : ''}{optimalityGap.toFixed(2)}%
+        {/* ═══ KPI Grid ═══ */}
+        <Section title="Algorithm Performance" subtitle="Smart Graph vs Greedy Baseline">
+          <div style={{ display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Baseline (Greedy) Profit</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <AnimatedValue value={baselineProfit} /> ₴
+              </div>
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {smartProfit > baselineProfit ? '+' : ''}{Math.round(smartProfit - baselineProfit).toLocaleString('uk-UA')} ₴ absolute
+            <div style={{ width: 1, height: 40, background: 'var(--border-color)' }} />
+            <div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Smart Graph Profit</div>
+              <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                <AnimatedValue value={smartProfit} /> ₴
+              </div>
+            </div>
+            <div style={{ width: 1, height: 40, background: 'var(--border-color)' }} />
+            <div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Optimality Gap</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ background: optimalityGap >= 0 ? '#34c75920' : '#ff3b3020', color: optimalityGap >= 0 ? '#34c759' : '#ff3b30', padding: '4px 8px', borderRadius: '6px', fontSize: '16px', fontWeight: 700 }}>
+                  <TrendingUp size={16} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }} />
+                  {optimalityGap >= 0 ? '+' : ''}{optimalityGap.toFixed(2)}%
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  {smartProfit > baselineProfit ? '+' : ''}{Math.round(smartProfit - baselineProfit).toLocaleString('uk-UA')} ₴ absolute
+                </div>
+              </div>
             </div>
           </div>
         </Section>
 
         {/* ═══ Schedule Quick Stats ═══ */}
-        <div className="analytics-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '14px', marginBottom: '24px' }}>
           <StatCard icon={Truck} label="Vehicles deployed" value={totalVehicles} />
-          <StatCard icon={Target} label="Avg profit/order" 
-            value={<><AnimatedValue value={avgProfitPerOrder} /> ₴</>} 
-            color={avgProfitPerOrder >= 0 ? 'var(--success)' : 'var(--danger)'} />
-          <StatCard icon={Fuel} label="Total distance"
-            value={<><AnimatedValue value={scheduleData?.totalDistanceKm ?? 0} /> km</>} />
+          <StatCard icon={Target} label="Avg profit/order" value={<><AnimatedValue value={avgProfitPerOrder} /> ₴</>} color={avgProfitPerOrder >= 0 ? 'var(--success)' : 'var(--danger)'} />
+          <StatCard icon={Fuel} label="Total distance" value={<><AnimatedValue value={scheduleData?.totalDistanceKm ?? 0} /> km</>} />
         </div>
 
-        {/* ═══ Monte Carlo — Confidence Interval Band ═══ */}
-        <Section 
-          title="Profit Distribution — Monte Carlo Simulation" 
-          subtitle={`Range: ${Math.round(minProfit).toLocaleString('uk-UA')} ₴ – ${Math.round(maxProfit).toLocaleString('uk-UA')} ₴ · Green line = expected value (μ), bands = ±1σ / ±2σ`}
+        {/* ═══ Monte Carlo Histogram ═══ */}
+        <Section
+          title="Profit Distribution — Monte Carlo Simulation"
+          subtitle={`${iterations} simulation runs · μ = ${Math.round(expectedValue).toLocaleString('uk-UA')} ₴ · σ = ±${Math.round(stdDev).toLocaleString('uk-UA')} ₴ · Доводить стохастичну стійкість алгоритму`}
         >
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={ciData}>
-              <defs>
-                <linearGradient id="band2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007aff" stopOpacity={0.06} />
-                  <stop offset="100%" stopColor="#007aff" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="band1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007aff" stopOpacity={0.12} />
-                  <stop offset="100%" stopColor="#007aff" stopOpacity={0.04} />
-                </linearGradient>
-              </defs>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'μ (Expected)', value: `${Math.round(expectedValue).toLocaleString('uk-UA')} ₴`, color: '#34c759' },
+              { label: '±1σ range', value: `${Math.round(expectedValue - stdDev).toLocaleString('uk-UA')} – ${Math.round(expectedValue + stdDev).toLocaleString('uk-UA')} ₴`, color: '#007aff' },
+              { label: 'Min / Max', value: `${Math.round(minProfit).toLocaleString('uk-UA')} / ${Math.round(maxProfit).toLocaleString('uk-UA')} ₴`, color: 'var(--text-secondary)' },
+            ].map(b => (
+              <div key={b.label} style={{ background: 'var(--bg-primary)', borderRadius: '10px', padding: '8px 14px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{b.label}</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: b.color, marginTop: '2px' }}>{b.value}</div>
+              </div>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={mcHistogram} barCategoryGap="4%">
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-              <XAxis dataKey="iteration" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70}
-                tickFormatter={v => v.toLocaleString('uk-UA')} domain={['auto', 'auto']} />
-              <Tooltip content={<CustomTooltip />} />
-              {/* ±2σ band */}
-              <Area type="monotone" dataKey="upper2" stroke="none" fill="url(#band2)" />
-              <Area type="monotone" dataKey="lower2" stroke="none" fill="url(#band2)" />
-              {/* ±1σ band */}
-              <Area type="monotone" dataKey="upper1" stroke="none" fill="url(#band1)" />
-              <Area type="monotone" dataKey="lower1" stroke="none" fill="url(#band1)" />
-              {/* Mean reference */}
-              <ReferenceLine y={expectedValue} stroke="#34c759" strokeDasharray="5 4" strokeWidth={1.5} />
-              {/* Actual profit line */}
-              <Line type="monotone" dataKey="profit" stroke="#007aff" strokeWidth={2.5} dot={false}
-                activeDot={{ r: 5, fill: '#007aff', stroke: 'white', strokeWidth: 2 }} />
-            </AreaChart>
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={v => v.toLocaleString('uk-UA')} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={34} />
+              <Tooltip content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0]?.payload;
+                return (
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', border: '1px solid var(--border-color)', fontSize: '12px' }}>
+                    <div style={{ color: 'var(--text-secondary)' }}>{Math.round(d.rangeStart).toLocaleString('uk-UA')} – {Math.round(d.rangeEnd).toLocaleString('uk-UA')} ₴</div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{d.count} симуляцій</div>
+                  </div>
+                );
+              }} />
+              <ReferenceLine x={Math.round(expectedValue)} stroke="#34c759" strokeDasharray="5 4" strokeWidth={2} label={{ value: 'μ', fill: '#34c759', fontSize: 12 }} />
+              <ReferenceLine x={Math.round(expectedValue - stdDev)} stroke="#007aff" strokeDasharray="3 3" strokeWidth={1} />
+              <ReferenceLine x={Math.round(expectedValue + stdDev)} stroke="#007aff" strokeDasharray="3 3" strokeWidth={1} label={{ value: '±σ', fill: '#007aff', fontSize: 10 }} />
+              <Bar dataKey="count" name="Frequency" radius={[4, 4, 0, 0]}>
+                {mcHistogram.map((entry, i) => (
+                  <Cell key={i} fill={entry.rangeStart <= expectedValue + stdDev && entry.rangeEnd >= expectedValue - stdDev ? '#007aff' : 'var(--border-color)'} opacity={entry.rangeStart <= expectedValue + stdDev && entry.rangeEnd >= expectedValue - stdDev ? 0.75 : 0.4} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </Section>
 
-        {/* ═══ Fleet Utilization ═══ */}
-        {fleetUtil.length > 0 && (
-          <Section title="Fleet Utilization" subtitle="Time breakdown per vehicle (minutes)">
-            <ResponsiveContainer width="100%" height={Math.max(200, fleetUtil.length * 44)}>
-              <BarChart data={fleetUtil} layout="vertical" barCategoryGap="20%">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
-                  tickFormatter={v => `${v}m`} />
-                <YAxis type="category" dataKey="vehicle" axisLine={false} tickLine={false} width={70}
-                  tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <Tooltip content={<CustomTooltip suffix=" min" />} />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="order" stackId="a" fill="#34c759" name="Order" radius={0} />
-                <Bar dataKey="transfer" stackId="a" fill="#007aff" name="Transfer" radius={0} />
-                <Bar dataKey="commute" stackId="a" fill="#ff9f0a" name="Commute" radius={0} />
-                <Bar dataKey="waiting" stackId="a" fill="#8e8e93" name="Waiting" radius={0} />
-                <Bar dataKey="breakdown" stackId="a" fill="#ff3b30" name="Breakdown" radius={[0, 4, 4, 0]} />
-              </BarChart>
+        {/* ═══ Linear Regression Scatter ═══ */}
+        {orderPoints.length > 0 && (
+          <Section
+            title="Відстань vs Дохід — Регресійний аналіз"
+            subtitle={`Лінійна регресія OLS: ŷ = ${reg.a.toFixed(0)} ${reg.b >= 0 ? '+' : '-'} ${Math.abs(reg.b).toFixed(1)}x · R² = ${reg.r2.toFixed(3)} — ${reg.r2 > 0.5 ? 'сильна лінійна залежність' : reg.r2 > 0.2 ? 'слабка залежність — інші фактори важливіші' : 'відстань не є визначальним фактором доходу'}`}
+          >
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ background: 'var(--bg-primary)', borderRadius: '10px', padding: '8px 14px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>R² (детермінація)</div>
+                <div style={{ fontSize: '20px', fontWeight: 700, color: reg.r2 > 0.5 ? 'var(--success)' : reg.r2 > 0.2 ? 'var(--warning)' : 'var(--danger)', marginTop: '2px' }}>{reg.r2.toFixed(3)}</div>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis type="number" dataKey="x" name="Distance" unit=" km" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} label={{ value: 'Відстань (км)', position: 'insideBottom', offset: -2, fontSize: 11, fill: 'var(--text-secondary)' }} />
+                <YAxis type="number" dataKey="y" name="Profit" unit=" ₴" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70} />
+                <Tooltip content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0]?.payload;
+                  return (
+                    <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', border: '1px solid var(--border-color)', fontSize: '12px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{d?.vehicle}</div>
+                      <div style={{ color: 'var(--text-secondary)' }}>{d?.x} km</div>
+                      <div style={{ fontWeight: 700, color: d?.y >= 0 ? 'var(--success)' : 'var(--danger)' }}>{d?.y >= 0 ? '+' : ''}{d?.y} ₴</div>
+                    </div>
+                  );
+                }} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                <Scatter name="Замовлення (ORDER)" data={orderPoints} fill="#34c759" opacity={0.75} />
+                <Scatter name="Переміщення (TRANSFER)" data={transferPoints} fill="#007aff" opacity={0.4} />
+                <Scatter name="Лінія регресії (OLS)" data={regressionLine} fill="none" line={{ stroke: '#ff9f0a', strokeWidth: 2, strokeDasharray: '6 3' }} shape={() => null} />
+              </ScatterChart>
             </ResponsiveContainer>
           </Section>
         )}
 
-        {/* ═══ Revenue per Vehicle ═══ */}
-        {revenuePerVehicle.length > 0 && (
-          <Section title="Revenue per Vehicle" subtitle="Net profit/loss contribution by each vehicle">
-            <ResponsiveContainer width="100%" height={Math.max(180, revenuePerVehicle.length * 38)}>
-              <BarChart data={revenuePerVehicle} layout="vertical" barSize={20}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
-                  tickFormatter={v => v.toLocaleString('uk-UA')} />
-                <YAxis type="category" dataKey="vehicle" axisLine={false} tickLine={false} width={70}
-                  tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+        {/* ═══ Fleet Utilization & Cost Breakdown ═══ */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+          {costBreakdown.length > 0 && (
+            <Section title="Cost Breakdown" subtitle="Структура доходів і витрат">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                <ResponsiveContainer width={180} height={180}>
+                  <PieChart>
+                    <Pie data={costBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" stroke="none">
+                      {costBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {costBreakdown.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{d.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{d.value.toLocaleString('uk-UA')} ₴</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Section>
+          )}
+
+          {fleetUtil.length > 0 && (
+            <Section title="Fleet Utilization" subtitle="Часовий розподіл роботи (хв)">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={fleetUtil} layout="vertical" barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-color)" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickFormatter={v => `${v}m`} />
+                  <YAxis type="category" dataKey="vehicle" axisLine={false} tickLine={false} width={60} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                  <Tooltip content={<CustomTooltip suffix=" min" />} />
+                  <Bar dataKey="order" stackId="a" fill="#34c759" name="Order" radius={0} />
+                  <Bar dataKey="transfer" stackId="a" fill="#007aff" name="Transfer" radius={0} />
+                  <Bar dataKey="commute" stackId="a" fill="#ff9f0a" name="Commute" radius={0} />
+                  <Bar dataKey="waiting" stackId="a" fill="#8e8e93" name="Waiting" radius={0} />
+                  <Bar dataKey="breakdown" stackId="a" fill="#ff3b30" name="Breakdown" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Section>
+          )}
+        </div>
+
+        {/* ═══ Sensitivity Bar Chart ═══ */}
+        {sensitivityData.length > 0 && (
+          <Section title="Look-Ahead Sensitivity Analysis" subtitle="Вплив горизонту планування на загальний прибуток (обґрунтування горизонту)">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={sensitivityData} barSize={36}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                <XAxis dataKey="minutes" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70} tickFormatter={v => v.toLocaleString('uk-UA')} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine x={0} stroke="var(--border-color)" />
-                <Bar dataKey="profit" name="Profit" radius={[0, 6, 6, 0]}>
-                  {revenuePerVehicle.map((entry, i) => (
-                    <Cell key={i} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />
+                <ReferenceLine y={sensitivityData[0]?.profit} stroke="var(--danger)" strokeDasharray="4 3" strokeWidth={1} />
+                <Bar dataKey="profit" name="Profit" radius={[6, 6, 0, 0]}>
+                  {sensitivityData.map((entry, i) => (
+                    <Cell key={i} fill={entry.minutes === '120m' ? '#007aff' : entry.profit > (sensitivityData[0]?.profit ?? 0) ? '#34c759' : 'var(--border-color)'} opacity={entry.minutes === '120m' ? 1 : 0.7} />
                   ))}
                 </Bar>
               </BarChart>
@@ -370,90 +460,8 @@ export default function AnalyticsView() {
           </Section>
         )}
 
-        {/* ═══ Cost Breakdown Donut ═══ */}
-        {costBreakdown.length > 0 && (
-          <Section title="Cost Breakdown" subtitle="Revenue vs operational costs">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '40px', flexWrap: 'wrap' }}>
-              <ResponsiveContainer width={260} height={260}>
-                <PieChart>
-                  <Pie data={costBreakdown} cx="50%" cy="50%" innerRadius={70} outerRadius={110}
-                    paddingAngle={3} dataKey="value" stroke="none">
-                    {costBreakdown.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {costBreakdown.map((d, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{d.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{d.value.toLocaleString('uk-UA')} ₴</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Section>
-        )}
-
-        {/* ═══ Distance vs Revenue Scatter ═══ */}
-        {scatterData.length > 0 && (
-          <Section title="Distance vs Revenue" subtitle="Each dot = one segment. Is distance always proportional to revenue?">
-            <ResponsiveContainer width="100%" height={280}>
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis type="number" dataKey="distance" name="Distance" unit=" km" axisLine={false} tickLine={false}
-                  tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis type="number" dataKey="profit" name="Profit" unit=" ₴" axisLine={false} tickLine={false}
-                  tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70} />
-                <Tooltip content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const d = payload[0]?.payload;
-                  return (
-                    <div style={{
-                      background: 'var(--bg-secondary)', borderRadius: '12px', padding: '12px 16px',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.12)', border: '1px solid var(--border-color)',
-                      fontSize: '13px', color: 'var(--text-primary)',
-                    }}>
-                      <div style={{ fontWeight: 600 }}>{d?.vehicle}</div>
-                      <div style={{ color: 'var(--text-secondary)' }}>{d?.type} · {d?.distance} km</div>
-                      <div style={{ color: d?.profit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                        {d?.profit >= 0 ? '+' : ''}{d?.profit} ₴
-                      </div>
-                    </div>
-                  );
-                }} />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Scatter name="Orders" data={scatterOrders} fill="#34c759" opacity={0.7} />
-                <Scatter name="Transfers" data={scatterTransfers} fill="#007aff" opacity={0.5} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </Section>
-        )}
-
-        {/* ═══ Look-Ahead Sensitivity ═══ */}
-        {sensitivityData.length > 0 && (
-          <Section title="Look-Ahead Sensitivity Analysis" subtitle="How far-ahead planning horizon affects total profit">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={sensitivityData} barSize={36}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="minutes" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={70}
-                  tickFormatter={v => v.toLocaleString('uk-UA')} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="profit" fill="var(--accent-blue)" radius={[6, 6, 0, 0]} name="Profit" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Section>
-        )}
-
-        {/* ═══ Footer ═══ */}
         <div style={{ textAlign: 'center', padding: '20px 0 40px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-          Analysis generated from {iterations} Monte Carlo iterations · {segments.length} schedule segments · {totalVehicles} vehicles
+          Analysis generated from {iterations} Monte Carlo iterations · {segments.length} schedule segments
         </div>
       </div>
     </div>

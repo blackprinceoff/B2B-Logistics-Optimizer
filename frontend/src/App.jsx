@@ -65,6 +65,8 @@ function App() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
+  const [sharedSchedule, setSharedSchedule] = useState(null);
+
   return (
     <ToastProvider>
       <Router>
@@ -72,8 +74,8 @@ function App() {
           <Navbar isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} />
           <div style={{ flexGrow: 1, overflow: 'hidden' }}>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/analytics" element={<AnalyticsView />} />
+              <Route path="/" element={<Dashboard sharedSchedule={sharedSchedule} setSharedSchedule={setSharedSchedule} />} />
+              <Route path="/analytics" element={<AnalyticsView sharedSchedule={sharedSchedule} />} />
             </Routes>
           </div>
         </div>

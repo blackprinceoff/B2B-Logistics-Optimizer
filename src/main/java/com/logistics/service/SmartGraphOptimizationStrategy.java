@@ -37,7 +37,8 @@ public class SmartGraphOptimizationStrategy implements OptimizationStrategy {
 
     @Setter
     private int lookAheadMinutes = 120;
-    private final Random random = new Random(12345);
+    // Non-deterministic seed — each MC iteration gets real stochastic variance
+    private final Random random = new Random();
 
     @Override
     public List<RouteSegment> optimize(List<Order> orders, List<Vehicle> vehicles, List<Driver> drivers,

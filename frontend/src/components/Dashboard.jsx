@@ -4,8 +4,8 @@ import Sidebar from './Sidebar';
 import MidDayModal from './MidDayModal';
 import { useToast } from './Toast';
 
-export default function Dashboard() {
-  const [scheduleData, setScheduleData]       = useState(null);
+export default function Dashboard({ sharedSchedule, setSharedSchedule }) {
+  const scheduleData = sharedSchedule;
   const [loading, setLoading]                 = useState(false);
   const [locationMap, setLocationMap]         = useState({});
   const [selectedVehicle, setSelectedVehicle] = useState('All');
@@ -36,7 +36,7 @@ export default function Dashboard() {
       const res = await fetch('/api/optimize');
       if (!res.ok) throw new Error('Backend error ' + res.status);
       const data = await res.json();
-      setScheduleData(data);
+      setSharedSchedule(data);
       setSelectedVehicle('All');
       setActiveRouteId(null);
       addToast(`Optimization complete — ${data.completedOrders} orders, ${data.totalProfit.toFixed(0)} ₴ profit`, 'success');
@@ -49,7 +49,7 @@ export default function Dashboard() {
   };
 
   const handleMidDayResult = (data) => {
-    setScheduleData(data);
+    setSharedSchedule(data);
     setSelectedVehicle('All');
     setActiveRouteId(null);
     addToast(`Re-optimization complete — ${data.completedOrders} orders rescheduled`, 'success');
