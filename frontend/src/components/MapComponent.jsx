@@ -2,8 +2,9 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { buildVehicleColorMap, getSegmentColor, COMMUTE_COLOR } from '../utils/vehicleColors';
 
-// Fix Leaflet's default icon path issues in Vite/React
+// Fix Leaflet default icon paths in Vite/React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -13,18 +14,13 @@ L.Icon.Default.mergeOptions({
 
 const dotIcon = new L.DivIcon({
   className: 'custom-dot-icon',
-  html: '<div style="width:12px;height:12px;background:var(--bg-secondary, #fff);border:3px solid var(--text-primary, #1d1d1f);border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>',
+  html: '<div style="width:12px;height:12px;background:var(--bg-secondary,#fff);border:3px solid var(--text-primary,#1d1d1f);border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>',
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 });
 
-const ROUTE_COLORS = [
-  '#2563EB', '#16A34A', '#DC2626', '#D97706', 
-  '#7C3AED', '#0891B2', '#DB2777', '#65A30D'
-];
-
 /**
- * Fetches real road geometry from OSRM for a single segment.
+ * Fetches real road geometry from OSRM.
  * Falls back to a straight line if the request fails or is rate-limited.
  */
 async function fetchRoadGeometry(startLoc, endLoc, fallbackCoords) {
@@ -41,45 +37,42 @@ async function fetchRoadGeometry(startLoc, endLoc, fallbackCoords) {
 }
 
 /* ── Map Legend overlay ── */
-function MapLegend({ segments }) {
-  // Collect unique vehicles (not COMMUTE) with their colors
-  const vehicles = useMemo(() => {
-    if (!segments?.length) return [];
-    const seen = new Map();
-    segments.forEach((seg, idx) => {
-      if (seg.vehicleId === 'COMMUTE') return;
-      if (!seen.has(seg.vehicleId)) {
-        seen.set(seg.vehicleId, ROUTE_COLORS[idx % ROUTE_COLORS.length]);
-      }
-    });
-    return Array.from(seen.entries()).map(([id, color]) => ({ id, color }));
-  }, [segments]);
-
-  if (vehicles.length === 0) return null;
+function MapLegend({ vehicleColorMap }) {
+  const entries = Object.entries(vehicleColorMap);
+  if (entries.length === 0) return null;
 
   return (
     <div className="map-legend">
       <div className="map-legend-title">Route Legend</div>
-      {vehicles.map(v => (
-        <div key={v.id} className="map-legend-item">
-          <div className="map-legend-dot" style={{ background: v.color }} />
-          {v.id}
+      {entries.map(([id, color]) => (
+        <div key={id} className="map-legend-item">
+          <div className="map-legend-dot" style={{ background: color }} />
+          {id}
         </div>
       ))}
+      {/* Commute legend entry */}
+      <div className="map-legend-item" style={{ opacity: 0.6 }}>
+        <div className="map-legend-dot" style={{ background: COMMUTE_COLOR }} />
+        Commute
+      </div>
     </div>
   );
 }
 
 export default function MapComponent({ scheduleData, selectedVehicle, activeRouteId, locationMap }) {
-  // locationMap now comes from props (Dashboard), no duplicate API call
   const [routes, setRoutes] = useState([]);
   const polylineRefs = useRef({});
 
-  // Draw routes whenever schedule or filter changes
+  // Stable vehicle → colour map — single source of truth shared with Sidebar
+  const vehicleColorMap = useMemo(
+    () => buildVehicleColorMap(scheduleData?.schedule ?? []),
+    [scheduleData]
+  );
+
+  // Draw routes whenever schedule or vehicle filter changes
   useEffect(() => {
     if (!scheduleData?.schedule || Object.keys(locationMap).length === 0) return;
 
-    // Attach originalIndex to match Sidebar logic
     const segmentsWithIndex = scheduleData.schedule.map((seg, idx) => ({ ...seg, originalIndex: idx }));
 
     const filtered = selectedVehicle === 'All'
@@ -88,7 +81,7 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
 
     const drawRoutes = async () => {
       setRoutes([]);
-      polylineRefs.current = {}; // Reset refs on redraw
+      polylineRefs.current = {};
 
       for (const seg of filtered) {
         const start = locationMap[seg.startLocationId];
@@ -96,13 +89,13 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
 
         if (!start || !end) continue;
 
-        // Static locations (WAITING/BREAKDOWN): no line needed, just a marker
+        // Breakdown: marker only, no line
         if (seg.type === 'BREAKDOWN') {
           setRoutes(prev => [...prev, { ...seg, _isBreakdown: true, _pos: [start.lat, start.lng] }]);
           continue;
         }
 
-        // Same start/end = waiting segment — skip drawing
+        // Same start/end = waiting in place — skip
         if (start.lat === end.lat && start.lng === end.lng) continue;
 
         const straightLine = [[start.lat, start.lng], [end.lat, end.lng]];
@@ -114,13 +107,12 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
     drawRoutes();
   }, [scheduleData, selectedVehicle, locationMap]);
 
-  // Handle activeRouteId changes directly via Leaflet refs
+  // Update polyline styles when active route changes (via Leaflet refs — no re-render)
   useEffect(() => {
     Object.keys(polylineRefs.current).forEach(key => {
       const idx = parseInt(key, 10);
       const polyline = polylineRefs.current[idx];
       if (polyline) {
-        // Apply smooth transition if not already applied
         if (polyline._path && !polyline._path.style.transition) {
           polyline._path.style.transition = 'opacity 150ms ease';
         }
@@ -150,7 +142,7 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
           url='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
         />
 
-        {/* Location markers — sourced from backend via props */}
+        {/* Location markers */}
         {Object.values(locationMap).map((loc, idx) => (
           <Marker key={idx} position={[loc.lat, loc.lng]} icon={dotIcon}>
             <Popup>
@@ -160,27 +152,26 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
         ))}
 
         {/* Route polylines + breakdown markers */}
-        {routes.map((r, idx) => {
+        {routes.map((r) => {
           if (r._isBreakdown) {
             return (
-              <Marker key={idx} position={r._pos}>
+              <Marker key={`bd-${r.originalIndex}`} position={r._pos}>
                 <Popup><b style={{ color: 'var(--danger)' }}>BREAKDOWN!</b><br />{r.vehicleId}</Popup>
               </Marker>
             );
           }
-          
-          const routeColor = ROUTE_COLORS[r.originalIndex % ROUTE_COLORS.length];
+
+          // ✅ Colour by vehicleId — consistent with Sidebar and Legend
+          const routeColor = getSegmentColor(r, vehicleColorMap);
           const isActive = activeRouteId === r.originalIndex;
           const initialOpacity = activeRouteId === null ? 0.75 : (isActive ? 1.0 : 0.08);
-          const initialWeight = activeRouteId === null ? 4 : (isActive ? 5 : 3);
+          const initialWeight  = activeRouteId === null ? 4    : (isActive ? 5   : 3);
 
           return (
-            <Polyline 
+            <Polyline
               key={r.originalIndex}
-              ref={(ref) => {
-                if (ref) polylineRefs.current[r.originalIndex] = ref;
-              }}
-              positions={r.coords} 
+              ref={(ref) => { if (ref) polylineRefs.current[r.originalIndex] = ref; }}
+              positions={r.coords}
               pathOptions={{ color: routeColor, weight: initialWeight, opacity: initialOpacity }}
             >
               <Popup>
@@ -197,8 +188,8 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
         })}
       </MapContainer>
 
-      {/* Legend overlay */}
-      <MapLegend segments={scheduleData?.schedule} />
+      {/* Legend — driven by vehicleColorMap, always consistent */}
+      <MapLegend vehicleColorMap={vehicleColorMap} />
     </div>
   );
 }
