@@ -13,7 +13,7 @@ export default function SensitivityChart({ sensitivityData }) {
   const maxProfit = Math.max(...sensitivityData.map(d => d.profit));
 
   return (
-    <Section title="Look-Ahead Sensitivity Analysis" subtitle="Impact of planning horizon on total profit">
+    <Section title="Look-Ahead Sensitivity Analysis" subtitle="Impact of planning horizon on total profit · Grey bars indicate no improvement over baseline">
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={sensitivityData} barSize={36} margin={{ top: 24, right: 60, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />

@@ -44,6 +44,7 @@ function MapLegend({ vehicleColorMap }) {
   return (
     <div className="map-legend">
       <div className="map-legend-title">Route Legend</div>
+      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '8px' }}>D — driver commute · V — vehicle route</div>
       {entries.map(([id, color]) => (
         <div key={id} className="map-legend-item">
           <div className="map-legend-dot" style={{ background: color }} />
@@ -179,7 +180,7 @@ export default function MapComponent({ scheduleData, selectedVehicle, activeRout
                   <b style={{ textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>{r.type}</b>
                   <div style={{ fontWeight: 600 }}>{r.vehicleId}</div>
                   <div style={{ color: r.profitOrCost >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {r.profitOrCost > 0 ? '+' : ''}{r.profitOrCost?.toFixed(2)} ₴
+                    {r.profitOrCost > 0 ? '+' : ''}{r.profitOrCost?.toLocaleString('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₴
                   </div>
                 </div>
               </Popup>

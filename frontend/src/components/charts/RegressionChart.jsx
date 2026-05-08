@@ -34,7 +34,7 @@ export default function RegressionChart({ orderPoints, transferPoints, reg, regr
               <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', border: '1px solid var(--border-color)', fontSize: '12px' }}>
                 <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{type}</div>
                 <div style={{ color: 'var(--text-secondary)' }}>Distance: {d.x} km</div>
-                <div style={{ fontWeight: 700, color: d.y >= 0 ? 'var(--success)' : 'var(--danger)' }}>Revenue: {d.y >= 0 ? '+' : ''}{d.y} ₴</div>
+                <div style={{ fontWeight: 700, color: d.y >= 0 ? 'var(--success)' : 'var(--danger)' }}>Revenue: {d.y >= 0 ? '+' : ''}{d.y.toLocaleString('uk-UA')} ₴</div>
               </div>
             );
           }} />

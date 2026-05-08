@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, TrendingUp, AlertTriangle, Truck, Fuel, Target, Info } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, AlertTriangle, Truck, Fuel, Target, Info } from 'lucide-react';
 import AnimatedNumber from './ui/AnimatedNumber';
 import StatCard from './ui/StatCard';
 import Section from './ui/Section';
@@ -107,7 +107,10 @@ export default function AnalyticsView({ sharedSchedule }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: optimalityGap >= 0 ? COLORS.successBg : COLORS.dangerBg, color: optimalityGap >= 0 ? COLORS.success : COLORS.danger, padding: '4px 8px', borderRadius: '6px', fontSize: '16px', fontWeight: 700 }}>
-                  <TrendingUp size={16} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }} />
+                  {optimalityGap >= 0 ? 
+                    <TrendingUp size={16} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }} /> :
+                    <TrendingDown size={16} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }} />
+                  }
                   {optimalityGap >= 0 ? '+' : ''}{optimalityGap.toFixed(2)}%
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
