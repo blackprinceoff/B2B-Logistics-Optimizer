@@ -31,7 +31,7 @@ export default function AnimatedNumber({ value, prefix = '', suffix = '', color,
 
   return (
     <span style={{ color }} className={value !== 0 ? 'count-pop' : ''}>
-      {prefix}{decimals > 0 ? display.toFixed(decimals) : Math.round(display).toLocaleString('uk-UA')}{suffix}
+      {prefix}{display.toLocaleString('uk-UA', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}
     </span>
   );
 }

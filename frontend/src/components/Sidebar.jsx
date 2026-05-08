@@ -223,6 +223,7 @@ export default function Sidebar({
           background: 'var(--bg-secondary)', borderRadius: '14px', padding: '16px',
           boxShadow: 'var(--card-shadow)', border: '1px solid var(--glass-border)',
           transition: 'background 0.3s ease',
+          ...(data?.schedule ? { animation: 'fadeSlideUp 400ms cubic-bezier(0.25,0.1,0.25,1) both' } : {})
         }}>
           <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
             Financial Summary

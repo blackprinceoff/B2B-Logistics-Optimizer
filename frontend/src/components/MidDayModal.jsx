@@ -139,8 +139,8 @@ export default function MidDayModal({ onClose, onResult }) {
                 fontSize: '14px', outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 color: 'var(--text-primary)',
               }}>
-              <option value="none">No breakdown — everything is fine</option>
-              {uniqueVehicles.map(v => <option key={v} value={v}>🚨 {v} — engine failure</option>)}
+              <option value="none">None — Normal Operation</option>
+              {uniqueVehicles.map(v => <option key={v} value={v}>{v} — Engine Failure</option>)}
             </select>
 
             <div style={{ display: 'flex', gap: '10px' }}>

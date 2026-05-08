@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, TrendingUp, AlertTriangle, Truck, Fuel, Target } from 'lucide-react';
+import { Activity, TrendingUp, AlertTriangle, Truck, Fuel, Target, Info } from 'lucide-react';
 import AnimatedNumber from './ui/AnimatedNumber';
 import StatCard from './ui/StatCard';
 import Section from './ui/Section';
@@ -76,14 +76,15 @@ export default function AnalyticsView({ sharedSchedule }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: '32px 40px', background: 'var(--bg-primary)', transition: 'background 0.3s' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <div>
+          <div style={{ animation: 'fadeSlideUp 400ms cubic-bezier(0.25,0.1,0.25,1) both' }}>
             <h1 style={{ fontSize: '28px', marginBottom: '6px', color: 'var(--text-primary)' }}>Analytics</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Algorithm performance & stochastic robustness metrics</p>
           </div>
         </div>
 
         {/* ═══ KPI Grid ═══ */}
-        <Section title="Algorithm Performance" subtitle="Smart Graph vs Greedy Baseline">
+        <div style={{ animation: 'fadeSlideUp 500ms cubic-bezier(0.25,0.1,0.25,1) both', animationDelay: '50ms' }}>
+          <Section title="Algorithm Performance" subtitle="Smart Graph vs Greedy Baseline">
           <div style={{ display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Baseline (Greedy) Profit</div>
@@ -100,7 +101,10 @@ export default function AnalyticsView({ sharedSchedule }) {
             </div>
             <div style={{ width: 1, height: 40, background: 'var(--border-color)' }} />
             <div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>Optimality Gap</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                Optimality Gap
+                <Info size={13} color="var(--text-secondary)" style={{ cursor: 'help' }} title="Relative profit improvement of the Smart Graph algorithm compared to the Greedy Baseline" />
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: optimalityGap >= 0 ? COLORS.successBg : COLORS.dangerBg, color: optimalityGap >= 0 ? COLORS.success : COLORS.danger, padding: '4px 8px', borderRadius: '6px', fontSize: '16px', fontWeight: 700 }}>
                   <TrendingUp size={16} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'text-bottom' }} />
@@ -112,7 +116,8 @@ export default function AnalyticsView({ sharedSchedule }) {
               </div>
             </div>
           </div>
-        </Section>
+          </Section>
+        </div>
 
         {/* ═══ Schedule Quick Stats ═══ */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '14px', marginBottom: '24px' }}>
@@ -122,15 +127,21 @@ export default function AnalyticsView({ sharedSchedule }) {
         </div>
 
         {/* ═══ Charts ═══ */}
-        <MonteCarloChart {...analytics} />
-        <RegressionChart {...analytics} />
+        <div style={{ animation: 'fadeSlideUp 500ms cubic-bezier(0.25,0.1,0.25,1) both', animationDelay: '100ms' }}>
+          <MonteCarloChart {...analytics} />
+        </div>
+        <div style={{ animation: 'fadeSlideUp 500ms cubic-bezier(0.25,0.1,0.25,1) both', animationDelay: '150ms' }}>
+          <RegressionChart {...analytics} />
+        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', animation: 'fadeSlideUp 500ms cubic-bezier(0.25,0.1,0.25,1) both', animationDelay: '200ms' }}>
           <CostBreakdownChart costBreakdown={analytics.costBreakdown} />
           <FleetUtilizationChart fleetUtil={analytics.fleetUtil} />
         </div>
 
-        <SensitivityChart sensitivityData={analytics.sensitivityData} />
+        <div style={{ animation: 'fadeSlideUp 500ms cubic-bezier(0.25,0.1,0.25,1) both', animationDelay: '250ms' }}>
+          <SensitivityChart sensitivityData={analytics.sensitivityData} />
+        </div>
 
         <div style={{ textAlign: 'center', padding: '20px 0 40px', color: 'var(--text-secondary)', fontSize: '12px' }}>
           Analysis generated from {iterations} Monte Carlo iterations · {segments.length} schedule segments
